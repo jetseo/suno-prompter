@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Suno AI Prompter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #080c10;
+      --surface: #0e1318;
+      --surface2: #141a22;
+      --surface3: #1c242e;
+      --border: rgba(255,255,255,0.07);
+      --border-bright: rgba(255,255,255,0.15);
+      --accent: #00e5a0;
+      --accent2: #00b8ff;
+      --accent3: #ff6b6b;
+      --text: #e8edf2;
+      --text2: #8a9ab0;
+      --text3: #4a5a6a;
+      --yellow: #ffd93d;
+      --mono: 'Space Mono', monospace;
+      --sans: 'DM Sans', sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body { background: var(--bg); font-family: var(--sans); color: var(--text); display: flex; flex-direction: column; }
+
+    /* HEADER */
+    .header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 20px; border-bottom: 1px solid var(--border);
+      background: var(--surface); flex-shrink: 0;
+    }
+    .logo { display: flex; align-items: center; gap: 10px; }
+    .logo-dot {
+      width: 30px; height: 30px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 7px; display: flex; align-items: center; justify-content: center;
+      font-size: 15px;
+    }
+    .logo-text { font-family: var(--mono); font-size: 13px; font-weight: 700; letter-spacing: 0.08em; color: var(--accent); }
+    .logo-sub { font-size: 10px; color: var(--text3); font-weight: 400; letter-spacing: 0.04em; }
+    .header-right { font-family: var(--mono); font-size: 11px; color: var(--text3); }
+
+    /* TAB STRIP */
+    .tab-strip {
+      display: flex; gap: 4px; padding: 10px 20px;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      overflow-x: auto; scrollbar-width: none; flex-shrink: 0;
+    }
+    .tab-strip::-webkit-scrollbar { display: none; }
+    .tab {
+      display: flex; align-items: center; gap: 5px;
+      padding: 7px 16px; border-radius: 8px; border: 1px solid var(--border);
+      cursor: pointer; font-size: 12px; font-weight: 500; color: var(--text3);
+      background: none; transition: all 0.15s; white-space: nowrap;
+      font-family: var(--sans);
+    }
+    .tab:hover { border-color: var(--border-bright); color: var(--text2); }
+    .tab.active { background: var(--accent); color: #000; border-color: var(--accent); }
+    .tab.done { border-color: rgba(0,229,160,0.3); color: var(--accent); }
+    .tab .check { display: none; font-size: 10px; }
+    .tab.done .check { display: inline; }
+
+    /* MAIN */
+    .main { display: grid; grid-template-columns: 320px 1fr 270px; flex: 1; overflow: hidden; }
+
+    /* PANELS */
+    .panel { overflow-y: auto; padding: 18px; scrollbar-width: thin; scrollbar-color: var(--surface3) transparent; }
+    .panel::-webkit-scrollbar { width: 4px; }
+    .panel::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 2px; }
+    .left-panel { border-right: 1px solid var(--border); }
+    .mid-panel { border-right: 1px solid var(--border); }
+
+    .panel-title { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; color: var(--text3); text-transform: uppercase; margin-bottom: 16px; }
+    .section-label { font-size: 11px; color: var(--text3); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 8px; margin-top: 16px; }
+    .section-label:first-of-type { margin-top: 0; }
+
+    /* BUTTONS */
+    .btn-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+    .sel-btn {
+      padding: 6px 12px; border-radius: 7px; border: 1px solid var(--border);
+      background: var(--surface2); color: var(--text2); font-size: 12px;
+      cursor: pointer; transition: all 0.15s; font-family: var(--sans);
+    }
+    .sel-btn:hover { border-color: var(--border-bright); color: var(--text); }
+    .sel-btn.selected { background: rgba(0,229,160,0.12); border-color: var(--accent); color: var(--accent); }
+
+    /* BPM */
+    .bpm-display { font-family: var(--mono); font-size: 44px; font-weight: 700; color: var(--accent); letter-spacing: -0.02em; margin-bottom: 10px; }
+    .bpm-display span { font-size: 16px; color: var(--text3); margin-left: 4px; }
+    .bpm-slider { width: 100%; height: 4px; border-radius: 2px; background: var(--surface3); appearance: none; outline: none; cursor: pointer; margin-bottom: 10px; }
+    .bpm-slider::-webkit-slider-thumb { appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); cursor: pointer; box-shadow: 0 0 8px rgba(0,229,160,0.5); }
+    .bpm-input-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .bpm-num { width: 70px; background: var(--surface2); border: 1px solid var(--border); color: var(--text); font-family: var(--mono); font-size: 13px; padding: 6px 10px; border-radius: 6px; outline: none; }
+    .bpm-num:focus { border-color: var(--accent); }
+    .bpm-hint { font-size: 11px; color: var(--text3); }
+    .preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 12px; }
+    .preset-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 9px 11px; cursor: pointer; transition: all 0.15s; }
+    .preset-card:hover { border-color: var(--border-bright); }
+    .preset-card.selected { border-color: var(--accent); background: rgba(0,229,160,0.07); }
+    .preset-name { font-size: 12px; font-weight: 500; color: var(--text); }
+    .preset-bpm { font-family: var(--mono); font-size: 10px; color: var(--accent); margin-top: 1px; }
+    .preset-desc { font-size: 10px; color: var(--text3); margin-top: 2px; }
+
+    /* TEXTAREA */
+    .text-inp { width: 100%; background: var(--surface2); border: 1px solid var(--border); color: var(--text); font-family: var(--sans); font-size: 12px; padding: 10px 12px; border-radius: 8px; outline: none; resize: vertical; min-height: 80px; line-height: 1.5; }
+    .text-inp:focus { border-color: var(--accent); }
+    .text-inp::placeholder { color: var(--text3); }
+
+    .reset-row { display: flex; justify-content: flex-end; margin-top: 18px; }
+    .reset-btn { background: none; border: 1px solid var(--border); color: var(--text3); font-size: 11px; font-family: var(--sans); padding: 6px 14px; border-radius: 6px; cursor: pointer; transition: all 0.15s; }
+    .reset-btn:hover { border-color: var(--accent3); color: var(--accent3); }
+
+    /* MID PANEL */
+    .mid-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .save-btn { background: none; border: 1px solid var(--border); color: var(--text3); font-size: 10px; font-family: var(--sans); padding: 5px 11px; border-radius: 5px; cursor: pointer; transition: all 0.15s; }
+    .save-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+
+    .status-badge { padding: 10px 13px; border-radius: 8px; font-size: 12px; margin-bottom: 14px; border: 1px solid; line-height: 1.4; }
+    .status-ok { background: rgba(0,229,160,0.08); border-color: rgba(0,229,160,0.25); color: var(--accent); }
+    .status-warn { background: rgba(255,217,61,0.08); border-color: rgba(255,217,61,0.25); color: var(--yellow); }
+    .status-empty { background: rgba(138,154,176,0.08); border-color: rgba(138,154,176,0.12); color: var(--text3); }
+
+    .sum-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 9px 0; border-bottom: 1px solid var(--border); gap: 10px; }
+    .sum-row:last-child { border-bottom: none; }
+    .sum-key { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.05em; min-width: 55px; padding-top: 1px; }
+    .sum-val { font-size: 12px; color: var(--text); text-align: right; flex: 1; }
+    .sum-val.empty { color: var(--text3); font-style: italic; }
+    .sum-val.bpm { font-family: var(--mono); color: var(--accent); }
+
+    /* RIGHT PANEL */
+    .prompt-box { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 13px; font-family: var(--mono); font-size: 11px; color: var(--text); line-height: 1.7; min-height: 130px; word-break: break-word; margin-bottom: 8px; }
+    .prompt-box.empty { color: var(--text3); font-family: var(--sans); font-style: italic; font-size: 12px; }
+    .char-count { font-family: var(--mono); font-size: 10px; color: var(--text3); text-align: right; margin-bottom: 10px; }
+    .char-count .over { color: var(--accent3); }
+    .copy-btn { width: 100%; background: var(--accent); border: none; color: #000; font-family: var(--sans); font-size: 12px; font-weight: 600; padding: 10px; border-radius: 8px; cursor: pointer; transition: all 0.15s; margin-bottom: 14px; }
+    .copy-btn:hover { background: #00ffb2; }
+    .copy-btn:active { transform: scale(0.98); }
+    .copy-btn.copied { background: var(--surface3); color: var(--accent); border: 1px solid var(--accent); }
+
+    .mod-title { font-size: 11px; color: var(--text3); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 9px; }
+    .mod-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .mod-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--text2); font-size: 11px; font-family: var(--sans); padding: 8px 10px; border-radius: 7px; cursor: pointer; transition: all 0.15s; text-align: center; }
+    .mod-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+    .mod-btn.active { background: rgba(0,184,255,0.1); border-color: var(--accent2); color: var(--accent2); }
+    .mod-result { margin-top: 10px; background: var(--surface2); border: 1px solid rgba(0,184,255,0.2); border-radius: 8px; padding: 11px; font-family: var(--mono); font-size: 10px; color: var(--text); line-height: 1.6; word-break: break-word; }
+
+    .genre-hint { font-size: 11px; color: var(--accent); margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <div class="logo-dot">♪</div>
+    <div>
+      <div class="logo-text">SUNO AI PROMPTER</div>
+      <div class="logo-sub">선택형 AI 음악 프롬프트 빌더</div>
+    </div>
+  </div>
+  <div class="header-right">v1.0</div>
+</div>
+
+<div class="tab-strip" id="tabStrip"></div>
+
+<div class="main">
+  <div class="panel left-panel" id="leftPanel"></div>
+  <div class="panel mid-panel" id="midPanel"></div>
+  <div class="panel right-panel" id="rightPanel"></div>
+</div>
+
+<script>
+const DATA = {
+  regions: ['아시아','유럽','북미','남미','아프리카','오세아니아'],
+  countries: {
+    '아시아':['한국','일본','인도','중국','태국','인도네시아'],
+    '유럽':['영국','프랑스','독일','스페인','이탈리아','스웨덴'],
+    '북미':['미국','캐나다','멕시코','자메이카'],
+    '남미':['브라질','콜롬비아','아르헨티나','쿠바','푸에르토리코'],
+    '아프리카':['나이지리아','남아프리카','이집트','가나'],
+    '오세아니아':['호주','뉴질랜드'],
+  },
+  genres: {
+    '한국':['K-Pop','K-R&B','Trot','Korean Folk','K-Hip Hop'],
+    '일본':['J-Pop','City Pop','Enka','J-Rock','Shibuya-kei'],
+    '인도':['Bollywood','Bhangra','Classical Carnatic'],
+    '중국':['Mandopop','C-Pop','Cantopop'],
+    '태국':['Luk Thung','Thai Pop','Mor Lam'],
+    '인도네시아':['Dangdut','Indonesian Pop','Gamelan Fusion'],
+    '영국':['Britpop','UK Garage','Drum & Bass','Grime','Shoegaze'],
+    '프랑스':['French Pop','Chanson','French Electronic','Musette'],
+    '독일':['Techno','Krautrock','Schlager'],
+    '스페인':['Flamenco','Spanish Pop','Rumba Catalana'],
+    '이탈리아':['Italian Pop','Opera Fusion','Mediterranean'],
+    '스웨덴':['Swedish Pop','Nordic Folk','Melodic Death Metal'],
+    '미국':['Hip Hop','R&B','Country','Blues','Jazz','Pop Rock','Gospel'],
+    '캐나다':['Canadian Folk','Indie Rock'],
+    '멕시코':['Mariachi','Norteño','Banda'],
+    '자메이카':['Reggae','Dancehall','Ska'],
+    '브라질':['Samba','Bossa Nova','Forró','Funk Carioca','MPB'],
+    '콜롬비아':['Cumbia','Vallenato','Dance Latin'],
+    '아르헨티나':['Tango','Argentine Rock','Folklore'],
+    '쿠바':['Salsa','Son Cubano','Bolero','Timba'],
+    '푸에르토리코':['Reggaeton','Salsa','Trap Latino'],
+    '나이지리아':['Afrobeats','Juju','Highlife'],
+    '남아프리카':['Amapiano','Kwaito'],
+    '이집트':['Shaabi','Arabic Pop','Nubian'],
+    '가나':['Highlife','Azonto','Afrobeats'],
+    '호주':['Indie Rock','Australian Hip Hop'],
+    '뉴질랜드':['Māori Music','Indie Pop'],
+  },
+  moods: ['Passionate','Melancholic','Euphoric','Dark','Nostalgic','Warm','Dreamy','Aggressive','Peaceful','Mysterious','Romantic','Energetic'],
+  instruments: {
+    base: ['Piano','Guitar','Bass Guitar','Drums','Violin','Cello','Trumpet','Saxophone','Synth','Electric Guitar'],
+    byGenre: {
+      'Samba':['Latin Percussion','Nylon Guitar','Cavaquinho','Pandeiro'],
+      'Bossa Nova':['Nylon Guitar','Upright Bass','Brushed Drums'],
+      'K-Pop':['808 Bass','Synth Lead','Electronic Drums','String Section'],
+      'Reggae':['Rhythm Guitar','Bass','Horns','Organ'],
+      'Salsa':['Timbales','Congas','Trumpet','Piano'],
+      'Flamenco':['Spanish Guitar','Cajon','Handclaps'],
+      'Tango':['Bandoneón','Violin','Piano','Double Bass'],
+      'Techno':['Synthesizer','808 Drum Machine','Arp Synth'],
+      'Hip Hop':['808 Bass','SP-404 Sampler','Hi-Hat'],
+      'Jazz':['Upright Bass','Brushed Drums','Muted Trumpet','Hammond Organ'],
+    }
+  },
+  vocals: ['Male Vocal','Female Vocal','Duet','Choir','Rap Vocal','Falsetto','Whisper Vocal','Passionate Vocal','Smooth Vocal','Gritty Vocal','No Vocal (Instrumental)'],
+  extras: ['groove verse and chant-like chorus','call and response structure','dramatic key change','spoken word bridge','a cappella section','fade out ending','sudden stop ending','rhythmic repetition','ethereal reverb tail','layered harmonics'],
+  bpmPresets: [
+    {name:'감성 발라드',bpm:70,desc:'느리고 감정적인 곡'},
+    {name:'R&B / 힙합',bpm:86,desc:'그루브 중심'},
+    {name:'인디 팝',bpm:95,desc:'산뜻한 중간 템포'},
+    {name:'팝',bpm:100,desc:'메인스트림 흐름'},
+    {name:'EDM / 댄스',bpm:120,desc:'추진감 있는 전개'},
+    {name:'하우스',bpm:128,desc:'클럽 친화적 에너지'},
+    {name:'트랩 / EDM',bpm:140,desc:'강한 드롭과 펀치감'},
+    {name:'드럼앤베이스',bpm:160,desc:'매우 빠른 질주감'},
+  ],
+  modifiers: ['More emotional','More energetic','More cinematic','More minimal'],
+};
+
+const STORIES = [
+  {id:'chase',label:'꿈을 향한 질주',en:'chasing dreams with the reckless heart of youth'},
+  {id:'loss',label:'이별 후의 밤',en:'the quiet heartbreak after goodbye'},
+  {id:'city',label:'도시의 불빛',en:'lost in the neon glow of a midnight city'},
+  {id:'rise',label:'역경을 넘어',en:'rising from the ashes of a broken past'},
+  {id:'love',label:'첫사랑의 기억',en:'the bittersweet memory of first love'},
+  {id:'freedom',label:'자유를 향해',en:'running toward the horizon of endless freedom'},
+  {id:'alone',label:'혼자만의 시간',en:'finding peace in the solitude of being alone'},
+  {id:'custom',label:'직접 입력',en:''},
+];
+
+const TAB_NAMES = ['스타일','스토리','분위기','템포','악기','보컬','기타'];
+
+let S = {
+  tab:0, region:null, country:null, genre:null,
+  stories:[], moods:[], bpm:107, bpmPreset:null,
+  instruments:[], vocal:null, customStory:'',
+  extras:[], modifiers:[], copied:false,
+};
+
+function buildPrompt(mods=[]) {
+  const parts = [];
+  if (S.genre) parts.push(S.genre);
+  if (S.moods.length) parts.push(...S.moods);
+  if (S.bpm) parts.push(S.bpm + ' BPM');
+  if (S.instruments.length) parts.push(...S.instruments);
+  if (S.vocal) parts.push(S.vocal);
+  const storyParts = S.stories.map(id => {
+    const st = STORIES.find(x => x.id === id);
+    return st?.id === 'custom' ? S.customStory : st?.en;
+  }).filter(Boolean);
+  if (storyParts.length) parts.push(...storyParts.map(p => 'about ' + p));
+  if (S.extras.length) parts.push(...S.extras);
+  if (mods.length) parts.push(...mods.map(m => m.toLowerCase().replace('more ','') + ' feel'));
+  return parts.join(', ');
+}
+
+function getStatus() {
+  const filled = [S.genre, S.moods.length, S.bpm, S.instruments.length, S.vocal].filter(Boolean).length;
+  if (filled === 0) return {type:'empty', msg:'왼쪽 패널에서 항목을 선택하면 프롬프트가 생성됩니다.'};
+  if (S.moods.length === 1) return {type:'warn', msg:'무드를 2개 이상 고르면 더 자연스러운 프롬프트가 됩니다.'};
+  if (filled >= 4) return {type:'ok', msg:'현재 조합은 비교적 안정적입니다.'};
+  return {type:'warn', msg:'더 많은 항목을 선택할수록 풍부한 프롬프트가 완성됩니다.'};
+}
+
+function isDone(i) {
+  return [!!S.genre, S.stories.length>0, S.moods.length>0, !!S.bpm, S.instruments.length>0, !!S.vocal, S.extras.length>0][i];
+}
+
+function h(tag, cls, html, attrs='') {
+  return `<${tag} class="${cls}" ${attrs}>${html}</${tag}>`;
+}
+
+function renderTabs() {
+  document.getElementById('tabStrip').innerHTML = TAB_NAMES.map((n,i) => {
+    const cls = S.tab===i ? 'tab active' : isDone(i) ? 'tab done' : 'tab';
+    return `<button class="${cls}" onclick="setTab(${i})"><span class="check">✓</span>${i+1} ${n}</button>`;
+  }).join('');
+}
+
+function renderLeft() {
+  const t = S.tab;
+  let html = `<div class="panel-title">${TAB_NAMES[t]}</div>`;
+
+  if (t === 0) {
+    const countries = S.region ? (DATA.countries[S.region]||[]) : [];
+    const genres = S.country ? (DATA.genres[S.country]||[]) : [];
+    html += `<div class="section-label">1. 지역 선택</div><div class="btn-grid">
+      ${DATA.regions.map(r=>`<button class="sel-btn ${S.region===r?'selected':''}" onclick="setRegion('${r}')">${r}</button>`).join('')}
+    </div>
+    <div class="section-label">2. 국가 선택</div><div class="btn-grid">
+      ${S.region ? countries.map(c=>`<button class="sel-btn ${S.country===c?'selected':''}" onclick="setCountry('${c}')">${c}</button>`).join('') : '<span style="font-size:12px;color:var(--text3)">지역을 먼저 선택하세요</span>'}
+    </div>
+    <div class="section-label">3. 장르 선택</div><div class="btn-grid">
+      ${S.country ? genres.map(g=>`<button class="sel-btn ${S.genre===g?'selected':''}" onclick="setGenre('${g}')">${g}</button>`).join('') : '<span style="font-size:12px;color:var(--text3)">국가를 먼저 선택하세요</span>'}
+    </div>`;
+  } else if (t === 1) {
+    html += `<div class="section-label">스토리 테마 (복수 선택)</div><div class="btn-grid">
+      ${STORIES.map(s=>`<button class="sel-btn ${S.stories.includes(s.id)?'selected':''}" onclick="toggleStory('${s.id}')">${s.label}</button>`).join('')}
+    </div>
+    ${S.stories.includes('custom') ? `<div class="section-label" style="margin-top:14px">직접 입력 (영문 권장)</div>
+      <textarea class="text-inp" placeholder="e.g. a journey through forgotten memories" oninput="setCustom(this.value)">${S.customStory}</textarea>` : ''}`;
+  } else if (t === 2) {
+    html += `<div class="section-label">분위기 (복수 선택)</div><div class="btn-grid">
+      ${DATA.moods.map(m=>`<button class="sel-btn ${S.moods.includes(m)?'selected':''}" onclick="toggleMood('${m}')">${m}</button>`).join('')}
+    </div>`;
+  } else if (t === 3) {
+    html += `<div class="bpm-display">${S.bpm}<span>BPM</span></div>
+    <input type="range" class="bpm-slider" min="40" max="200" step="1" value="${S.bpm}" oninput="setBpm(+this.value)">
+    <div class="bpm-input-row">
+      <input type="number" class="bpm-num" min="40" max="200" value="${S.bpm}" oninput="setBpm(Math.min(200,Math.max(40,+this.value||107)))">
+      <span class="bpm-hint">직접 입력 가능</span>
+    </div>
+    <div class="preset-grid">
+      ${DATA.bpmPresets.map((p,i)=>`<div class="preset-card ${S.bpmPreset===i?'selected':''}" onclick="setBpmPreset(${i},${p.bpm})">
+        <div class="preset-name">${p.name}</div>
+        <div class="preset-bpm">${p.bpm} BPM</div>
+        <div class="preset-desc">${p.desc}</div>
+      </div>`).join('')}
+    </div>`;
+  } else if (t === 4) {
+    const extra = S.genre && DATA.instruments.byGenre[S.genre] ? DATA.instruments.byGenre[S.genre] : [];
+    const all = [...new Set([...extra, ...DATA.instruments.base])];
+    html += (extra.length ? `<div class="genre-hint">✦ ${S.genre} 추천 악기</div>` : '') +
+      `<div class="section-label">악기 (복수 선택)</div><div class="btn-grid">
+        ${all.map(inst=>`<button class="sel-btn ${S.instruments.includes(inst)?'selected':''}" onclick="toggleInst('${inst.replace(/'/g,"\\'")}')">${inst}</button>`).join('')}
+      </div>`;
+  } else if (t === 5) {
+    html += `<div class="section-label">보컬 스타일</div><div class="btn-grid">
+      ${DATA.vocals.map(v=>`<button class="sel-btn ${S.vocal===v?'selected':''}" onclick="setVocal('${v}')">${v}</button>`).join('')}
+    </div>`;
+  } else if (t === 6) {
+    html += `<div class="section-label">기타 사항 (복수 선택)</div><div class="btn-grid">
+      ${DATA.extras.map(e=>`<button class="sel-btn ${S.extras.includes(e)?'selected':''}" onclick="toggleExtra(${JSON.stringify(e)})">${e}</button>`).join('')}
+    </div>`;
+  }
+
+  html += `<div class="reset-row"><button class="reset-btn" onclick="resetTab()">초기화</button></div>`;
+  document.getElementById('leftPanel').innerHTML = html;
+}
+
+function renderMid() {
+  const st = getStatus();
+  const storyText = S.stories.map(id=>{
+    const s = STORIES.find(x=>x.id===id);
+    return s?.id==='custom' ? S.customStory||'...' : s?.label;
+  }).filter(Boolean).join(', ') || '-';
+
+  const rows = [
+    {k:'스타일', v:[S.region,S.country,S.genre].filter(Boolean).join(' / ') || '-'},
+    {k:'스토리', v:storyText},
+    {k:'분위기', v:S.moods.join(', ') || '-'},
+    {k:'템포',   v:S.bpm, bpm:true},
+    {k:'악기',   v:S.instruments.join(', ') || '-'},
+    {k:'보컬',   v:S.vocal || '-'},
+    {k:'기타',   v:S.extras.join(', ') || '-'},
+    {k:'EQ',    v:'Flat (프롬프트 미반영)'},
+  ];
+
+  document.getElementById('midPanel').innerHTML = `
+    <div class="mid-header">
+      <div class="panel-title" style="margin:0">선택 요약</div>
+      <button class="save-btn" onclick="saveExcel()">↓ 엑셀 저장</button>
+    </div>
+    <div class="status-badge status-${st.type}">${st.msg}</div>
+    ${rows.map(r=>`<div class="sum-row">
+      <div class="sum-key">${r.k}</div>
+      <div class="sum-val ${r.v==='-'?'empty':''} ${r.bpm?'bpm':''}">${r.v}</div>
+    </div>`).join('')}`;
+}
+
+function renderRight() {
+  const prompt = buildPrompt();
+  const modPrompt = S.modifiers.length ? buildPrompt(S.modifiers) : '';
+  const display = modPrompt || prompt;
+  const charCount = display.length;
+
+  document.getElementById('rightPanel').innerHTML = `
+    <div class="mid-header">
+      <div class="panel-title" style="margin:0">전체 프롬프트</div>
+      <button class="save-btn" onclick="saveExcel()">↓ 엑셀</button>
+    </div>
+    <div class="prompt-box ${prompt?'':'empty'}">${prompt || '선택 항목이 없습니다.'}</div>
+    <div class="char-count"><span class="${charCount>200?'over':''}">${charCount}</span> / 200자</div>
+    <button class="copy-btn ${S.copied?'copied':''}" onclick="copyPrompt()">${S.copied?'✓ 복사됨':'클립보드 저장'}</button>
+    <div>
+      <div class="mod-title">변형 프롬프트</div>
+      <div class="mod-grid">
+        ${DATA.modifiers.map(m=>`<button class="mod-btn ${S.modifiers.includes(m)?'active':''}" onclick="toggleMod('${m}')">${m}</button>`).join('')}
+      </div>
+      ${modPrompt ? `<div class="mod-result">${modPrompt}</div>` : ''}
+    </div>`;
+}
+
+function render() { renderTabs(); renderLeft(); renderMid(); renderRight(); }
+
+// HANDLERS
+function setTab(i) { S.tab=i; render(); }
+function setRegion(r) { S.region=r; S.country=null; S.genre=null; render(); }
+function setCountry(c) { S.country=c; S.genre=null; render(); }
+function setGenre(g) { S.genre=g; render(); }
+function toggleStory(id) { S.stories=S.stories.includes(id)?S.stories.filter(x=>x!==id):[...S.stories,id]; render(); }
+function setCustom(v) { S.customStory=v; }
+function toggleMood(m) { S.moods=S.moods.includes(m)?S.moods.filter(x=>x!==m):[...S.moods,m]; render(); }
+function setBpm(v) { S.bpm=v; S.bpmPreset=null; render(); }
+function setBpmPreset(i,bpm) { S.bpm=bpm; S.bpmPreset=i; render(); }
+function toggleInst(inst) { S.instruments=S.instruments.includes(inst)?S.instruments.filter(x=>x!==inst):[...S.instruments,inst]; render(); }
+function setVocal(v) { S.vocal=v; render(); }
+function toggleExtra(e) { S.extras=S.extras.includes(e)?S.extras.filter(x=>x!==e):[...S.extras,e]; render(); }
+function toggleMod(m) { S.modifiers=S.modifiers.includes(m)?S.modifiers.filter(x=>x!==m):[...S.modifiers,m]; render(); }
+function resetTab() {
+  const t=S.tab;
+  if(t===0){S.region=null;S.country=null;S.genre=null;}
+  else if(t===1){S.stories=[];S.customStory='';}
+  else if(t===2){S.moods=[];}
+  else if(t===3){S.bpm=107;S.bpmPreset=null;}
+  else if(t===4){S.instruments=[];}
+  else if(t===5){S.vocal=null;}
+  else if(t===6){S.extras=[];}
+  render();
+}
+function copyPrompt() {
+  const p = buildPrompt(S.modifiers);
+  if (!p) return;
+  navigator.clipboard.writeText(p).then(()=>{
+    S.copied=true; render();
+    setTimeout(()=>{ S.copied=false; render(); }, 2000);
+  });
+}
+function saveExcel() {
+  const rows = [
+    ['카테고리','값','영문 프롬프트'],
+    ['스타일',[S.region,S.country,S.genre].filter(Boolean).join(' / '),S.genre||''],
+    ['분위기',S.moods.join(', '),S.moods.join(', ')],
+    ['템포',S.bpm+' BPM',S.bpm+' BPM'],
+    ['악기',S.instruments.join(', '),S.instruments.join(', ')],
+    ['보컬',S.vocal||'',S.vocal||''],
+    ['기타',S.extras.join(', '),S.extras.join(', ')],
+    ['','',''],
+    ['최종 프롬프트','',buildPrompt()],
+  ];
+  const csv = rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const blob = new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'suno-prompt-'+Date.now()+'.csv';
+  a.click();
+}
+
+render();
+</script>
+</body>
+</html>
