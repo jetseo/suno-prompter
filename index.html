@@ -4,156 +4,96 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Suno AI Prompter</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #080c10;
-      --surface: #0e1318;
-      --surface2: #141a22;
-      --surface3: #1c242e;
-      --border: rgba(255,255,255,0.07);
-      --border-bright: rgba(255,255,255,0.15);
-      --accent: #00e5a0;
-      --accent2: #00b8ff;
-      --accent3: #ff6b6b;
-      --text: #e8edf2;
-      --text2: #8a9ab0;
-      --text3: #4a5a6a;
-      --yellow: #ffd93d;
-      --mono: 'Space Mono', monospace;
-      --sans: 'DM Sans', sans-serif;
+      --bg:#080c10;--surface:#0e1318;--surface2:#141a22;--surface3:#1c242e;
+      --border:rgba(255,255,255,0.07);--border-bright:rgba(255,255,255,0.15);
+      --accent:#00e5a0;--accent2:#00b8ff;--accent3:#ff6b6b;
+      --text:#e8edf2;--text2:#8a9ab0;--text3:#4a5a6a;--yellow:#ffd93d;
+      --mono:'Space Mono',monospace;--sans:'DM Sans',sans-serif;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; overflow: hidden; }
-    body { background: var(--bg); font-family: var(--sans); color: var(--text); display: flex; flex-direction: column; }
-
-    /* HEADER */
-    .header {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 12px 20px; border-bottom: 1px solid var(--border);
-      background: var(--surface); flex-shrink: 0;
-    }
-    .logo { display: flex; align-items: center; gap: 10px; }
-    .logo-dot {
-      width: 30px; height: 30px;
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
-      border-radius: 7px; display: flex; align-items: center; justify-content: center;
-      font-size: 15px;
-    }
-    .logo-text { font-family: var(--mono); font-size: 13px; font-weight: 700; letter-spacing: 0.08em; color: var(--accent); }
-    .logo-sub { font-size: 10px; color: var(--text3); font-weight: 400; letter-spacing: 0.04em; }
-    .header-right { font-family: var(--mono); font-size: 11px; color: var(--text3); }
-
-    /* TAB STRIP */
-    .tab-strip {
-      display: flex; gap: 4px; padding: 10px 20px;
-      background: var(--surface); border-bottom: 1px solid var(--border);
-      overflow-x: auto; scrollbar-width: none; flex-shrink: 0;
-    }
-    .tab-strip::-webkit-scrollbar { display: none; }
-    .tab {
-      display: flex; align-items: center; gap: 5px;
-      padding: 7px 16px; border-radius: 8px; border: 1px solid var(--border);
-      cursor: pointer; font-size: 12px; font-weight: 500; color: var(--text3);
-      background: none; transition: all 0.15s; white-space: nowrap;
-      font-family: var(--sans);
-    }
-    .tab:hover { border-color: var(--border-bright); color: var(--text2); }
-    .tab.active { background: var(--accent); color: #000; border-color: var(--accent); }
-    .tab.done { border-color: rgba(0,229,160,0.3); color: var(--accent); }
-    .tab .check { display: none; font-size: 10px; }
-    .tab.done .check { display: inline; }
-
-    /* MAIN */
-    .main { display: grid; grid-template-columns: 320px 1fr 270px; flex: 1; overflow: hidden; }
-
-    /* PANELS */
-    .panel { overflow-y: auto; padding: 18px; scrollbar-width: thin; scrollbar-color: var(--surface3) transparent; }
-    .panel::-webkit-scrollbar { width: 4px; }
-    .panel::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 2px; }
-    .left-panel { border-right: 1px solid var(--border); }
-    .mid-panel { border-right: 1px solid var(--border); }
-
-    .panel-title { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; color: var(--text3); text-transform: uppercase; margin-bottom: 16px; }
-    .section-label { font-size: 11px; color: var(--text3); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 8px; margin-top: 16px; }
-    .section-label:first-of-type { margin-top: 0; }
-
-    /* BUTTONS */
-    .btn-grid { display: flex; flex-wrap: wrap; gap: 6px; }
-    .sel-btn {
-      padding: 6px 12px; border-radius: 7px; border: 1px solid var(--border);
-      background: var(--surface2); color: var(--text2); font-size: 12px;
-      cursor: pointer; transition: all 0.15s; font-family: var(--sans);
-    }
-    .sel-btn:hover { border-color: var(--border-bright); color: var(--text); }
-    .sel-btn.selected { background: rgba(0,229,160,0.12); border-color: var(--accent); color: var(--accent); }
-
-    /* BPM */
-    .bpm-display { font-family: var(--mono); font-size: 44px; font-weight: 700; color: var(--accent); letter-spacing: -0.02em; margin-bottom: 10px; }
-    .bpm-display span { font-size: 16px; color: var(--text3); margin-left: 4px; }
-    .bpm-slider { width: 100%; height: 4px; border-radius: 2px; background: var(--surface3); appearance: none; outline: none; cursor: pointer; margin-bottom: 10px; }
-    .bpm-slider::-webkit-slider-thumb { appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); cursor: pointer; box-shadow: 0 0 8px rgba(0,229,160,0.5); }
-    .bpm-input-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-    .bpm-num { width: 70px; background: var(--surface2); border: 1px solid var(--border); color: var(--text); font-family: var(--mono); font-size: 13px; padding: 6px 10px; border-radius: 6px; outline: none; }
-    .bpm-num:focus { border-color: var(--accent); }
-    .bpm-hint { font-size: 11px; color: var(--text3); }
-    .preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 12px; }
-    .preset-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 9px 11px; cursor: pointer; transition: all 0.15s; }
-    .preset-card:hover { border-color: var(--border-bright); }
-    .preset-card.selected { border-color: var(--accent); background: rgba(0,229,160,0.07); }
-    .preset-name { font-size: 12px; font-weight: 500; color: var(--text); }
-    .preset-bpm { font-family: var(--mono); font-size: 10px; color: var(--accent); margin-top: 1px; }
-    .preset-desc { font-size: 10px; color: var(--text3); margin-top: 2px; }
-
-    /* TEXTAREA */
-    .text-inp { width: 100%; background: var(--surface2); border: 1px solid var(--border); color: var(--text); font-family: var(--sans); font-size: 12px; padding: 10px 12px; border-radius: 8px; outline: none; resize: vertical; min-height: 80px; line-height: 1.5; }
-    .text-inp:focus { border-color: var(--accent); }
-    .text-inp::placeholder { color: var(--text3); }
-
-    .reset-row { display: flex; justify-content: flex-end; margin-top: 18px; }
-    .reset-btn { background: none; border: 1px solid var(--border); color: var(--text3); font-size: 11px; font-family: var(--sans); padding: 6px 14px; border-radius: 6px; cursor: pointer; transition: all 0.15s; }
-    .reset-btn:hover { border-color: var(--accent3); color: var(--accent3); }
-
-    /* MID PANEL */
-    .mid-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
-    .save-btn { background: none; border: 1px solid var(--border); color: var(--text3); font-size: 10px; font-family: var(--sans); padding: 5px 11px; border-radius: 5px; cursor: pointer; transition: all 0.15s; }
-    .save-btn:hover { border-color: var(--accent2); color: var(--accent2); }
-
-    .status-badge { padding: 10px 13px; border-radius: 8px; font-size: 12px; margin-bottom: 14px; border: 1px solid; line-height: 1.4; }
-    .status-ok { background: rgba(0,229,160,0.08); border-color: rgba(0,229,160,0.25); color: var(--accent); }
-    .status-warn { background: rgba(255,217,61,0.08); border-color: rgba(255,217,61,0.25); color: var(--yellow); }
-    .status-empty { background: rgba(138,154,176,0.08); border-color: rgba(138,154,176,0.12); color: var(--text3); }
-
-    .sum-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 9px 0; border-bottom: 1px solid var(--border); gap: 10px; }
-    .sum-row:last-child { border-bottom: none; }
-    .sum-key { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.05em; min-width: 55px; padding-top: 1px; }
-    .sum-val { font-size: 12px; color: var(--text); text-align: right; flex: 1; }
-    .sum-val.empty { color: var(--text3); font-style: italic; }
-    .sum-val.bpm { font-family: var(--mono); color: var(--accent); }
-
-    /* RIGHT PANEL */
-    .prompt-box { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 13px; font-family: var(--mono); font-size: 11px; color: var(--text); line-height: 1.7; min-height: 130px; word-break: break-word; margin-bottom: 8px; }
-    .prompt-box.empty { color: var(--text3); font-family: var(--sans); font-style: italic; font-size: 12px; }
-    .char-count { font-family: var(--mono); font-size: 10px; color: var(--text3); text-align: right; margin-bottom: 10px; }
-    .char-count .over { color: var(--accent3); }
-    .copy-btn { width: 100%; background: var(--accent); border: none; color: #000; font-family: var(--sans); font-size: 12px; font-weight: 600; padding: 10px; border-radius: 8px; cursor: pointer; transition: all 0.15s; margin-bottom: 14px; }
-    .copy-btn:hover { background: #00ffb2; }
-    .copy-btn:active { transform: scale(0.98); }
-    .copy-btn.copied { background: var(--surface3); color: var(--accent); border: 1px solid var(--accent); }
-
-    .mod-title { font-size: 11px; color: var(--text3); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 9px; }
-    .mod-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-    .mod-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--text2); font-size: 11px; font-family: var(--sans); padding: 8px 10px; border-radius: 7px; cursor: pointer; transition: all 0.15s; text-align: center; }
-    .mod-btn:hover { border-color: var(--accent2); color: var(--accent2); }
-    .mod-btn.active { background: rgba(0,184,255,0.1); border-color: var(--accent2); color: var(--accent2); }
-    .mod-result { margin-top: 10px; background: var(--surface2); border: 1px solid rgba(0,184,255,0.2); border-radius: 8px; padding: 11px; font-family: var(--mono); font-size: 10px; color: var(--text); line-height: 1.6; word-break: break-word; }
-
-    .genre-hint { font-size: 11px; color: var(--accent); margin-bottom: 8px; }
+    *{box-sizing:border-box;margin:0;padding:0;}
+    html,body{height:100%;overflow:hidden;}
+    body{background:var(--bg);font-family:var(--sans);color:var(--text);display:flex;flex-direction:column;}
+    .header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;}
+    .logo{display:flex;align-items:center;gap:10px;}
+    .logo-dot{width:30px;height:30px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:15px;}
+    .logo-text{font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:0.08em;color:var(--accent);}
+    .logo-sub{font-size:10px;color:var(--text3);letter-spacing:0.04em;}
+    .tab-strip{display:flex;gap:4px;padding:10px 20px;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;flex-shrink:0;}
+    .tab-strip::-webkit-scrollbar{display:none;}
+    .tab{display:flex;align-items:center;gap:5px;padding:7px 16px;border-radius:8px;border:1px solid var(--border);cursor:pointer;font-size:12px;font-weight:500;color:var(--text3);background:none;transition:all 0.15s;white-space:nowrap;font-family:var(--sans);}
+    .tab:hover{border-color:var(--border-bright);color:var(--text2);}
+    .tab.active{background:var(--accent);color:#000;border-color:var(--accent);}
+    .tab.done{border-color:rgba(0,229,160,0.3);color:var(--accent);}
+    .tab .check{display:none;font-size:10px;}
+    .tab.done .check{display:inline;}
+    .main{display:grid;grid-template-columns:330px 1fr 280px;flex:1;overflow:hidden;}
+    .panel{overflow-y:auto;padding:18px;scrollbar-width:thin;scrollbar-color:var(--surface3) transparent;}
+    .panel::-webkit-scrollbar{width:4px;}
+    .panel::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:2px;}
+    .left-panel{border-right:1px solid var(--border);}
+    .mid-panel{border-right:1px solid var(--border);}
+    .panel-title{font-family:var(--mono);font-size:11px;letter-spacing:0.1em;color:var(--text3);text-transform:uppercase;margin-bottom:16px;}
+    .section-label{font-size:11px;color:var(--text3);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:8px;margin-top:16px;}
+    .section-label:first-of-type{margin-top:0;}
+    .btn-grid{display:flex;flex-wrap:wrap;gap:6px;}
+    .sel-btn{padding:6px 12px;border-radius:7px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);font-size:12px;cursor:pointer;transition:all 0.15s;font-family:var(--sans);}
+    .sel-btn:hover{border-color:var(--border-bright);color:var(--text);}
+    .sel-btn.selected{background:rgba(0,229,160,0.12);border-color:var(--accent);color:var(--accent);}
+    .bpm-display{font-family:var(--mono);font-size:44px;font-weight:700;color:var(--accent);letter-spacing:-0.02em;margin-bottom:10px;}
+    .bpm-display span{font-size:16px;color:var(--text3);margin-left:4px;}
+    .bpm-slider{width:100%;height:4px;border-radius:2px;background:var(--surface3);appearance:none;outline:none;cursor:pointer;margin-bottom:10px;}
+    .bpm-slider::-webkit-slider-thumb{appearance:none;width:18px;height:18px;border-radius:50%;background:var(--accent);cursor:pointer;box-shadow:0 0 8px rgba(0,229,160,0.5);}
+    .bpm-input-row{display:flex;align-items:center;gap:8px;margin-bottom:4px;}
+    .bpm-num{width:70px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:13px;padding:6px 10px;border-radius:6px;outline:none;}
+    .bpm-num:focus{border-color:var(--accent);}
+    .bpm-hint{font-size:11px;color:var(--text3);}
+    .preset-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:12px;}
+    .preset-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 11px;cursor:pointer;transition:all 0.15s;}
+    .preset-card:hover{border-color:var(--border-bright);}
+    .preset-card.selected{border-color:var(--accent);background:rgba(0,229,160,0.07);}
+    .preset-name{font-size:12px;font-weight:500;color:var(--text);}
+    .preset-bpm{font-family:var(--mono);font-size:10px;color:var(--accent);margin-top:1px;}
+    .preset-desc{font-size:10px;color:var(--text3);margin-top:2px;}
+    .text-inp{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:var(--sans);font-size:12px;padding:10px 12px;border-radius:8px;outline:none;resize:vertical;min-height:70px;line-height:1.5;}
+    .text-inp:focus{border-color:var(--accent);}
+    .text-inp::placeholder{color:var(--text3);}
+    .reset-row{display:flex;justify-content:flex-end;margin-top:18px;}
+    .reset-btn{background:none;border:1px solid var(--border);color:var(--text3);font-size:11px;font-family:var(--sans);padding:6px 14px;border-radius:6px;cursor:pointer;transition:all 0.15s;}
+    .reset-btn:hover{border-color:var(--accent3);color:var(--accent3);}
+    .mid-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+    .save-btn{background:none;border:1px solid var(--border);color:var(--text3);font-size:10px;font-family:var(--sans);padding:5px 11px;border-radius:5px;cursor:pointer;transition:all 0.15s;}
+    .save-btn:hover{border-color:var(--accent2);color:var(--accent2);}
+    .status-badge{padding:10px 13px;border-radius:8px;font-size:12px;margin-bottom:14px;border:1px solid;line-height:1.4;}
+    .status-ok{background:rgba(0,229,160,0.08);border-color:rgba(0,229,160,0.25);color:var(--accent);}
+    .status-warn{background:rgba(255,217,61,0.08);border-color:rgba(255,217,61,0.25);color:var(--yellow);}
+    .status-empty{background:rgba(138,154,176,0.08);border-color:rgba(138,154,176,0.12);color:var(--text3);}
+    .sum-row{display:flex;justify-content:space-between;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--border);gap:10px;}
+    .sum-row:last-child{border-bottom:none;}
+    .sum-key{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em;min-width:55px;padding-top:1px;flex-shrink:0;}
+    .sum-val{font-size:12px;color:var(--text);text-align:right;flex:1;}
+    .sum-val.empty{color:var(--text3);font-style:italic;}
+    .sum-val.bpm{font-family:var(--mono);color:var(--accent);}
+    .prompt-box{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:13px;font-family:var(--mono);font-size:11px;color:var(--text);line-height:1.7;min-height:130px;word-break:break-word;margin-bottom:8px;}
+    .prompt-box.empty{color:var(--text3);font-family:var(--sans);font-style:italic;font-size:12px;}
+    .char-count{font-family:var(--mono);font-size:10px;color:var(--text3);text-align:right;margin-bottom:10px;}
+    .char-count .over{color:var(--accent3);}
+    .copy-btn{width:100%;background:var(--accent);border:none;color:#000;font-family:var(--sans);font-size:12px;font-weight:600;padding:10px;border-radius:8px;cursor:pointer;transition:all 0.15s;margin-bottom:14px;}
+    .copy-btn:hover{background:#00ffb2;}
+    .copy-btn:active{transform:scale(0.98);}
+    .copy-btn.copied{background:var(--surface3);color:var(--accent);border:1px solid var(--accent);}
+    .mod-title{font-size:11px;color:var(--text3);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:9px;}
+    .mod-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+    .mod-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text2);font-size:11px;font-family:var(--sans);padding:8px 10px;border-radius:7px;cursor:pointer;transition:all 0.15s;text-align:center;}
+    .mod-btn:hover{border-color:var(--accent2);color:var(--accent2);}
+    .mod-btn.active{background:rgba(0,184,255,0.1);border-color:var(--accent2);color:var(--accent2);}
+    .mod-result{margin-top:10px;background:var(--surface2);border:1px solid rgba(0,184,255,0.2);border-radius:8px;padding:11px;font-family:var(--mono);font-size:10px;color:var(--text);line-height:1.6;word-break:break-word;}
+    .genre-hint{font-size:11px;color:var(--accent);margin-bottom:8px;}
   </style>
 </head>
 <body>
-
 <div class="header">
   <div class="logo">
     <div class="logo-dot">♪</div>
@@ -162,101 +102,227 @@
       <div class="logo-sub">선택형 AI 음악 프롬프트 빌더</div>
     </div>
   </div>
-  <div class="header-right">v1.0</div>
+  <div style="font-family:var(--mono);font-size:11px;color:var(--text3)">v2.0</div>
 </div>
-
 <div class="tab-strip" id="tabStrip"></div>
-
 <div class="main">
   <div class="panel left-panel" id="leftPanel"></div>
   <div class="panel mid-panel" id="midPanel"></div>
   <div class="panel right-panel" id="rightPanel"></div>
 </div>
-
 <script>
-const DATA = {
-  regions: ['아시아','유럽','북미','남미','아프리카','오세아니아'],
-  countries: {
-    '아시아':['한국','일본','인도','중국','태국','인도네시아'],
-    '유럽':['영국','프랑스','독일','스페인','이탈리아','스웨덴'],
-    '북미':['미국','캐나다','멕시코','자메이카'],
-    '남미':['브라질','콜롬비아','아르헨티나','쿠바','푸에르토리코'],
-    '아프리카':['나이지리아','남아프리카','이집트','가나'],
-    '오세아니아':['호주','뉴질랜드'],
-  },
-  genres: {
-    '한국':['K-Pop','K-R&B','Trot','Korean Folk','K-Hip Hop'],
-    '일본':['J-Pop','City Pop','Enka','J-Rock','Shibuya-kei'],
-    '인도':['Bollywood','Bhangra','Classical Carnatic'],
-    '중국':['Mandopop','C-Pop','Cantopop'],
-    '태국':['Luk Thung','Thai Pop','Mor Lam'],
-    '인도네시아':['Dangdut','Indonesian Pop','Gamelan Fusion'],
-    '영국':['Britpop','UK Garage','Drum & Bass','Grime','Shoegaze'],
-    '프랑스':['French Pop','Chanson','French Electronic','Musette'],
-    '독일':['Techno','Krautrock','Schlager'],
-    '스페인':['Flamenco','Spanish Pop','Rumba Catalana'],
-    '이탈리아':['Italian Pop','Opera Fusion','Mediterranean'],
-    '스웨덴':['Swedish Pop','Nordic Folk','Melodic Death Metal'],
-    '미국':['Hip Hop','R&B','Country','Blues','Jazz','Pop Rock','Gospel'],
-    '캐나다':['Canadian Folk','Indie Rock'],
-    '멕시코':['Mariachi','Norteño','Banda'],
-    '자메이카':['Reggae','Dancehall','Ska'],
-    '브라질':['Samba','Bossa Nova','Forró','Funk Carioca','MPB'],
-    '콜롬비아':['Cumbia','Vallenato','Dance Latin'],
-    '아르헨티나':['Tango','Argentine Rock','Folklore'],
-    '쿠바':['Salsa','Son Cubano','Bolero','Timba'],
-    '푸에르토리코':['Reggaeton','Salsa','Trap Latino'],
-    '나이지리아':['Afrobeats','Juju','Highlife'],
-    '남아프리카':['Amapiano','Kwaito'],
-    '이집트':['Shaabi','Arabic Pop','Nubian'],
-    '가나':['Highlife','Azonto','Afrobeats'],
-    '호주':['Indie Rock','Australian Hip Hop'],
-    '뉴질랜드':['Māori Music','Indie Pop'],
-  },
-  moods: ['Passionate','Melancholic','Euphoric','Dark','Nostalgic','Warm','Dreamy','Aggressive','Peaceful','Mysterious','Romantic','Energetic'],
-  instruments: {
-    base: ['Piano','Guitar','Bass Guitar','Drums','Violin','Cello','Trumpet','Saxophone','Synth','Electric Guitar'],
-    byGenre: {
-      'Samba':['Latin Percussion','Nylon Guitar','Cavaquinho','Pandeiro'],
-      'Bossa Nova':['Nylon Guitar','Upright Bass','Brushed Drums'],
-      'K-Pop':['808 Bass','Synth Lead','Electronic Drums','String Section'],
-      'Reggae':['Rhythm Guitar','Bass','Horns','Organ'],
-      'Salsa':['Timbales','Congas','Trumpet','Piano'],
-      'Flamenco':['Spanish Guitar','Cajon','Handclaps'],
-      'Tango':['Bandoneón','Violin','Piano','Double Bass'],
-      'Techno':['Synthesizer','808 Drum Machine','Arp Synth'],
-      'Hip Hop':['808 Bass','SP-404 Sampler','Hi-Hat'],
-      'Jazz':['Upright Bass','Brushed Drums','Muted Trumpet','Hammond Organ'],
-    }
-  },
-  vocals: ['Male Vocal','Female Vocal','Duet','Choir','Rap Vocal','Falsetto','Whisper Vocal','Passionate Vocal','Smooth Vocal','Gritty Vocal','No Vocal (Instrumental)'],
-  extras: ['groove verse and chant-like chorus','call and response structure','dramatic key change','spoken word bridge','a cappella section','fade out ending','sudden stop ending','rhythmic repetition','ethereal reverb tail','layered harmonics'],
-  bpmPresets: [
-    {name:'감성 발라드',bpm:70,desc:'느리고 감정적인 곡'},
-    {name:'R&B / 힙합',bpm:86,desc:'그루브 중심'},
-    {name:'인디 팝',bpm:95,desc:'산뜻한 중간 템포'},
-    {name:'팝',bpm:100,desc:'메인스트림 흐름'},
-    {name:'EDM / 댄스',bpm:120,desc:'추진감 있는 전개'},
-    {name:'하우스',bpm:128,desc:'클럽 친화적 에너지'},
-    {name:'트랩 / EDM',bpm:140,desc:'강한 드롭과 펀치감'},
-    {name:'드럼앤베이스',bpm:160,desc:'매우 빠른 질주감'},
-  ],
-  modifiers: ['More emotional','More energetic','More cinematic','More minimal'],
+// ─── 데이터: 한글 표시 + 영문 프롬프트 값 분리 ───
+const REGIONS = ['아시아','유럽','북미','남미','아프리카','오세아니아','중동'];
+
+const COUNTRIES = {
+  '아시아':['한국','일본','인도','중국','태국','인도네시아','필리핀','베트남','말레이시아','몽골'],
+  '유럽':['영국','프랑스','독일','스페인','이탈리아','스웨덴','노르웨이','아일랜드','그리스','포르투갈','러시아','폴란드'],
+  '북미':['미국','캐나다','멕시코','자메이카','쿠바','트리니다드'],
+  '남미':['브라질','콜롬비아','아르헨티나','페루','칠레','베네수엘라','푸에르토리코'],
+  '아프리카':['나이지리아','남아프리카','이집트','가나','세네갈','에티오피아','케냐','말리'],
+  '오세아니아':['호주','뉴질랜드','하와이','피지'],
+  '중동':['이란','터키','이스라엘','레바논','이라크'],
 };
 
-const STORIES = [
-  {id:'chase',label:'꿈을 향한 질주',en:'chasing dreams with the reckless heart of youth'},
-  {id:'loss',label:'이별 후의 밤',en:'the quiet heartbreak after goodbye'},
-  {id:'city',label:'도시의 불빛',en:'lost in the neon glow of a midnight city'},
-  {id:'rise',label:'역경을 넘어',en:'rising from the ashes of a broken past'},
-  {id:'love',label:'첫사랑의 기억',en:'the bittersweet memory of first love'},
-  {id:'freedom',label:'자유를 향해',en:'running toward the horizon of endless freedom'},
-  {id:'alone',label:'혼자만의 시간',en:'finding peace in the solitude of being alone'},
-  {id:'custom',label:'직접 입력',en:''},
+const GENRES = {
+  '한국':['K-Pop','K-R&B','트로트','한국 민요','K-힙합','K-인디','한국 전통음악','발라드'],
+  '일본':['J-Pop','시티팝','엔카','J-록','시부야계','J-소울','오키나와 민요','애니송'],
+  '인도':['볼리우드','방그라','카르나틱 클래식','힌두스타니 클래식','필미','인디팝'],
+  '중국':['만다팝','C-Pop','광둥팝','구금 클래식','중국 전통','C-록'],
+  '태국':['룩퉁','타이팝','모람','타이 록','타이 힙합'],
+  '인도네시아':['당둣','인도네시아팝','가믈란 퓨전','자바 전통','레게 인도네시아'],
+  '필리핀':['OPM','필리핀 팝','쿠팡팝','발라다','필리핀 록'],
+  '베트남':['V-Pop','냐낙','까이르엉','전통 베트남'],
+  '말레이시아':['말레이팝','인디 말레이','당둣 말레이시아'],
+  '몽골':['몽골 민요','흐미','몽골 록','전통 마두금'],
+  '영국':['브릿팝','UK 개러지','드럼앤베이스','그라임','슈게이징','포크 록','포스트 펑크','뉴웨이브','애시드 하우스','UK 소울'],
+  '프랑스':['프렌치팝','샹송','프렌치 일렉트로닉','뮈제트','프렌치 하우스','누보 바그','아프로비트 프랑코'],
+  '독일':['테크노','크라우트록','슐라거','독일 힙합','유로댄스','NDW','앰비언트 베를린'],
+  '스페인':['플라멩코','스페인 팝','룸바 카탈라나','레게톤','스페인 록','파소도블레'],
+  '이탈리아':['이탈리안팝','오페라 퓨전','지중해','이탈리안 칸타우토레','유로비트'],
+  '스웨덴':['스웨디시팝','노르딕 포크','멜로딕 데스메탈','스웨디시 하우스','ABBA 스타일'],
+  '노르웨이':['노르딕 포크','블랙메탈','노르웨이 팝','사미 전통','노르딕 앰비언트'],
+  '아일랜드':['아이리시 포크','켈틱 록','트래드 세션','아이리시 팝'],
+  '그리스':['렘베티코','그리스 팝','비잔틴','그리스 록','라이카'],
+  '포르투갈':['파두','포르투갈 팝','포르투갈 록','케이프 베르데 퓨전'],
+  '러시아':['러시아 팝','발라드 러시아','러시아 록','전통 민요','러시아 힙합'],
+  '폴란드':['폴스카 팝','폴란드 록','폴란드 포크','클럽 폴란드'],
+  '미국':['힙합','R&B','컨트리','블루스','재즈','팝 록','가스펠','소울','모타운','인디 록','얼터너티브','어반 팝','트랩','이모','포스트록'],
+  '캐나다':['캐나디안 포크','인디 록','드레이크 스타일 R&B','퀘벡 팝','캐나다 컨트리'],
+  '멕시코':['마리아치','노르테뇨','반다','멕시코 팝','손 하로초','쿰비아 멕시코'],
+  '자메이카':['레게','댄스홀','스카','록스테디','더브','루츠 레게'],
+  '쿠바':['살사','손 쿠바노','볼레로','팀바','아바나 재즈','과히라'],
+  '트리니다드':['칼립소','소카','스틸팬','트리니다드 댄스홀'],
+  '브라질':['삼바','보사노바','포호','펑크 카리오카','MPB','악시','바이아오','람바다'],
+  '콜롬비아':['쿰비아','발레나토','댄스 라틴','콜롬비아 팝','피케테로'],
+  '아르헨티나':['탱고','아르헨티나 록','포클로레','쿠아르테토','말람보'],
+  '페루':['쿠에카','마리네라','아프로페루','살사 페루','치차'],
+  '칠레':['칠레 록','누에바 칸시온','쿠에카 칠레나','칠레 팝'],
+  '베네수엘라':['조로포','살사 베네수엘라','가이타','베네수엘라 팝'],
+  '푸에르토리코':['레게톤','살사','트랩 라티노','봄바','플레나'],
+  '나이지리아':['아프로비트','주주','하이라이프','아프로팝','푸지','나이하우사'],
+  '남아프리카':['아마피아노','콰이토','아프리칸스팝','음봄베','줄루 전통'],
+  '이집트':['샤아비','아랍 팝','누비안','움 쿨숨 스타일','이집트 재즈'],
+  '가나':['하이라이프','아존토','아프로비트 가나','히프라이프'],
+  '세네갈':['음발라스','사바르 전통','울로프팝','아프로컨템포러리'],
+  '에티오피아':['에티오재즈','암하릭팝','하베샤','에티오 전통'],
+  '케냐':['비코즈','케냐 팝','기쿠유 전통','나이로비 힙합'],
+  '말리':['젤리 전통','말리 블루스','투아레그 사막록'],
+  '호주':['인디 록','호주 힙합','컨트리 오스트레일리아','오지팝'],
+  '뉴질랜드':['마오리 음악','인디팝','키위 록','뉴질랜드 알앤비'],
+  '하와이':['하와이안','훌라 전통','이스트사이드 사운드','로코팝'],
+  '피지':['피지안 포크','퍼시픽 팝','멜라네시아 전통'],
+  '이란':['페르시안팝','이란 전통','다스트가'],
+  '터키':['터키 팝','아라베스크','오스만 전통','터키 록','다마크'],
+  '이스라엘':['이스라엘 팝','미즈라히','요르단 포크퓨전','이스라엘 일렉트로닉'],
+  '레바논':['레바논 팝','아랍 일렉트로닉','타랍'],
+  '이라크':['마캄','이라크 팝','아랍 전통'],
+};
+
+// 장르 → 영문 프롬프트값
+const GENRE_EN = {
+  'K-Pop':'K-Pop','K-R&B':'Korean R&B','트로트':'Trot','한국 민요':'Korean Folk','K-힙합':'K-Hip Hop','K-인디':'Korean Indie','한국 전통음악':'Korean Traditional','발라드':'Korean Ballad',
+  'J-Pop':'J-Pop','시티팝':'City Pop','엔카':'Enka','J-록':'J-Rock','시부야계':'Shibuya-kei','J-소울':'J-Soul','오키나와 민요':'Okinawan Folk','애니송':'Anime OST',
+  '볼리우드':'Bollywood','방그라':'Bhangra','카르나틱 클래식':'Carnatic Classical','힌두스타니 클래식':'Hindustani Classical','필미':'Filmi','인디팝':'Indian Indie Pop',
+  '만다팝':'Mandopop','C-Pop':'C-Pop','광둥팝':'Cantopop','구금 클래식':'Guqin Classical','중국 전통':'Chinese Traditional','C-록':'Chinese Rock',
+  '룩퉁':'Luk Thung','타이팝':'Thai Pop','모람':'Mor Lam','타이 록':'Thai Rock','타이 힙합':'Thai Hip Hop',
+  '당둣':'Dangdut','인도네시아팝':'Indonesian Pop','가믈란 퓨전':'Gamelan Fusion','자바 전통':'Javanese Traditional','레게 인도네시아':'Indonesian Reggae',
+  'OPM':'OPM','필리핀 팝':'Filipino Pop','쿠팡팝':'Cupang Pop','발라다':'Filipino Ballad','필리핀 록':'Filipino Rock',
+  'V-Pop':'V-Pop','냐낙':'Nha Nhac','까이르엉':'Cai Luong','전통 베트남':'Vietnamese Traditional',
+  '말레이팝':'Malay Pop','인디 말레이':'Malay Indie','당둣 말레이시아':'Malaysian Dangdut',
+  '몽골 민요':'Mongolian Folk','흐미':'Khoomei Throat Singing','몽골 록':'Mongolian Rock','전통 마두금':'Morin Khuur Traditional',
+  '브릿팝':'Britpop','UK 개러지':'UK Garage','드럼앤베이스':'Drum and Bass','그라임':'Grime','슈게이징':'Shoegaze','포크 록':'Folk Rock','포스트 펑크':'Post Punk','뉴웨이브':'New Wave','애시드 하우스':'Acid House','UK 소울':'UK Soul',
+  '프렌치팝':'French Pop','샹송':'Chanson','프렌치 일렉트로닉':'French Electronic','뮈제트':'Musette','프렌치 하우스':'French House','누보 바그':'Nouvelle Vague','아프로비트 프랑코':'Franco Afrobeat',
+  '테크노':'Techno','크라우트록':'Krautrock','슐라거':'Schlager','독일 힙합':'German Hip Hop','유로댄스':'Eurodance','NDW':'Neue Deutsche Welle','앰비언트 베를린':'Berlin Ambient',
+  '플라멩코':'Flamenco','스페인 팝':'Spanish Pop','룸바 카탈라나':'Rumba Catalana','레게톤':'Reggaeton','스페인 록':'Spanish Rock','파소도블레':'Pasodoble',
+  '이탈리안팝':'Italian Pop','오페라 퓨전':'Opera Fusion','지중해':'Mediterranean','이탈리안 칸타우토레':'Italian Cantautore','유로비트':'Eurobeat',
+  '스웨디시팝':'Swedish Pop','노르딕 포크':'Nordic Folk','멜로딕 데스메탈':'Melodic Death Metal','스웨디시 하우스':'Swedish House','ABBA 스타일':'ABBA-style Pop',
+  '노르딕 포크':'Nordic Folk','블랙메탈':'Black Metal','노르웨이 팝':'Norwegian Pop','사미 전통':'Sami Traditional','노르딕 앰비언트':'Nordic Ambient',
+  '아이리시 포크':'Irish Folk','켈틱 록':'Celtic Rock','트래드 세션':'Irish Trad Session','아이리시 팝':'Irish Pop',
+  '렘베티코':'Rembetiko','그리스 팝':'Greek Pop','비잔틴':'Byzantine','그리스 록':'Greek Rock','라이카':'Laika',
+  '파두':'Fado','포르투갈 팝':'Portuguese Pop','포르투갈 록':'Portuguese Rock','케이프 베르데 퓨전':'Cape Verdean Fusion',
+  '러시아 팝':'Russian Pop','발라드 러시아':'Russian Ballad','러시아 록':'Russian Rock','전통 민요':'Russian Folk','러시아 힙합':'Russian Hip Hop',
+  '폴스카 팝':'Polish Pop','폴란드 록':'Polish Rock','폴란드 포크':'Polish Folk','클럽 폴란드':'Polish Club',
+  '힙합':'Hip Hop','R&B':'R&B','컨트리':'Country','블루스':'Blues','재즈':'Jazz','팝 록':'Pop Rock','가스펠':'Gospel','소울':'Soul','모타운':'Motown','인디 록':'Indie Rock','얼터너티브':'Alternative Rock','어반 팝':'Urban Pop','트랩':'Trap','이모':'Emo','포스트록':'Post Rock',
+  '캐나디안 포크':'Canadian Folk','드레이크 스타일 R&B':'Drake-style R&B','퀘벡 팝':'Quebec Pop','캐나다 컨트리':'Canadian Country',
+  '마리아치':'Mariachi','노르테뇨':'Norteño','반다':'Banda','멕시코 팝':'Mexican Pop','손 하로초':'Son Jarocho','쿰비아 멕시코':'Mexican Cumbia',
+  '레게':'Reggae','댄스홀':'Dancehall','스카':'Ska','록스테디':'Rocksteady','더브':'Dub','루츠 레게':'Roots Reggae',
+  '살사':'Salsa','손 쿠바노':'Son Cubano','볼레로':'Bolero','팀바':'Timba','아바나 재즈':'Havana Jazz','과히라':'Guajira',
+  '칼립소':'Calypso','소카':'Soca','스틸팬':'Steel Pan','트리니다드 댄스홀':'Trinidad Dancehall',
+  '삼바':'Samba','보사노바':'Bossa Nova','포호':'Forró','펑크 카리오카':'Funk Carioca','MPB':'MPB','악시':'Axé','바이아오':'Baião','람바다':'Lambada',
+  '쿰비아':'Cumbia','발레나토':'Vallenato','댄스 라틴':'Dance Latin','콜롬비아 팝':'Colombian Pop','피케테로':'Piquetero',
+  '탱고':'Tango','아르헨티나 록':'Argentine Rock','포클로레':'Folklore','쿠아르테토':'Cuarteto','말람보':'Malambo',
+  '쿠에카':'Cueca','마리네라':'Marinera','아프로페루':'Afro-Peruvian','살사 페루':'Peruvian Salsa','치차':'Chicha',
+  '칠레 록':'Chilean Rock','누에바 칸시온':'Nueva Canción','쿠에카 칠레나':'Cueca Chilena','칠레 팝':'Chilean Pop',
+  '조로포':'Joropo','살사 베네수엘라':'Venezuelan Salsa','가이타':'Gaita','베네수엘라 팝':'Venezuelan Pop',
+  '트랩 라티노':'Trap Latino','봄바':'Bomba','플레나':'Plena',
+  '아프로비트':'Afrobeats','주주':'Juju','하이라이프':'Highlife','아프로팝':'Afropop','푸지':'Fuji','나이하우사':'Naija Hausa',
+  '아마피아노':'Amapiano','콰이토':'Kwaito','아프리칸스팝':'Afrikaans Pop','음봄베':'Mbombe','줄루 전통':'Zulu Traditional',
+  '샤아비':'Shaabi','아랍 팝':'Arabic Pop','누비안':'Nubian','움 쿨숨 스타일':'Oum Kulthum Style','이집트 재즈':'Egyptian Jazz',
+  '아존토':'Azonto','아프로비트 가나':'Ghana Afrobeats','히프라이프':'Hiplife',
+  '음발라스':'Mbalax','사바르 전통':'Sabar Traditional','울로프팝':'Wolof Pop','아프로컨템포러리':'Afro Contemporary',
+  '에티오재즈':'Ethio-Jazz','암하릭팝':'Amharic Pop','하베샤':'Habesha','에티오 전통':'Ethiopian Traditional',
+  '비코즈':'Benga','케냐 팝':'Kenyan Pop','기쿠유 전통':'Kikuyu Traditional','나이로비 힙합':'Nairobi Hip Hop',
+  '젤리 전통':'Griot Traditional','말리 블루스':'Mali Blues','투아레그 사막록':'Tuareg Desert Rock',
+  '인디 록':'Indie Rock','호주 힙합':'Australian Hip Hop','컨트리 오스트레일리아':'Australian Country','오지팝':'Aussie Pop',
+  '마오리 음악':'Māori Music','인디팝':'Indie Pop','키위 록':'Kiwi Rock','뉴질랜드 알앤비':'New Zealand R&B',
+  '하와이안':'Hawaiian','훌라 전통':'Hula Traditional','이스트사이드 사운드':'East Side Sound','로코팝':'Loco Pop',
+  '피지안 포크':'Fijian Folk','퍼시픽 팝':'Pacific Pop','멜라네시아 전통':'Melanesian Traditional',
+  '페르시안팝':'Persian Pop','이란 전통':'Iranian Traditional','다스트가':'Dastgah',
+  '터키 팝':'Turkish Pop','아라베스크':'Arabesque','오스만 전통':'Ottoman Classical','터키 록':'Turkish Rock','다마크':'Damak',
+  '이스라엘 팝':'Israeli Pop','미즈라히':'Mizrahi','요르단 포크퓨전':'Jordanian Folk Fusion','이스라엘 일렉트로닉':'Israeli Electronic',
+  '레바논 팝':'Lebanese Pop','아랍 일렉트로닉':'Arabic Electronic','타랍':'Tarab',
+  '마캄':'Maqam','이라크 팝':'Iraqi Pop','아랍 전통':'Arabic Traditional',
+};
+
+const MOODS_KO = ['열정적인','애수 어린','황홀한','어두운','향수 어린','따뜻한','몽환적인','공격적인','평화로운','신비로운','낭만적인','에너제틱한','우울한','기쁜','긴장감 있는','차분한','거칠고 날것의','웅장한','잔잔한','관능적인','순수한','외로운','희망찬','드라마틱한','불안한','유쾌한'];
+const MOODS_EN = ['Passionate','Melancholic','Euphoric','Dark','Nostalgic','Warm','Dreamy','Aggressive','Peaceful','Mysterious','Romantic','Energetic','Sad','Joyful','Tense','Calm','Raw and Gritty','Epic','Serene','Sensual','Pure','Lonely','Hopeful','Dramatic','Anxious','Playful'];
+
+const INSTR_BASE_KO = ['피아노','기타','베이스 기타','드럼','바이올린','첼로','트럼펫','색소폰','신디사이저','일렉트릭 기타','어쿠스틱 기타','플루트','오보에','클라리넷','하프','비올라','더블베이스','밴조','만돌린','우쿨렐레','하모니카','아코디언','멜로트론','로즈 피아노','오르간','무그 신스','페달 스틸','현악 4중주','오케스트라 스트링스','브라스 섹션'];
+const INSTR_BASE_EN = ['Piano','Guitar','Bass Guitar','Drums','Violin','Cello','Trumpet','Saxophone','Synthesizer','Electric Guitar','Acoustic Guitar','Flute','Oboe','Clarinet','Harp','Viola','Double Bass','Banjo','Mandolin','Ukulele','Harmonica','Accordion','Mellotron','Rhodes Piano','Organ','Moog Synth','Pedal Steel','String Quartet','Orchestral Strings','Brass Section'];
+
+const INSTR_BY_GENRE_KO = {
+  '삼바':['라틴 퍼커션','나일론 기타','카바키뉴','판데이루','아고고'],
+  '보사노바':['나일론 기타','업라이트 베이스','브러쉬드 드럼','카바키뉴'],
+  'K-Pop':['808 베이스','신스 리드','일렉트로닉 드럼','현악 섹션','보코더'],
+  '레게':['리듬 기타','베이스','혼 섹션','오르간','에코 기타'],
+  '살사':['팀발레스','콩가','트럼펫','피아노','베이스','마라카스'],
+  '플라멩코':['스패니시 기타','카혼','박수','캐스터네츠'],
+  '탱고':['반도네온','바이올린','피아노','더블베이스'],
+  '힙합':['808 베이스','SP-404 샘플러','하이햇','신스 패드'],
+  '재즈':['업라이트 베이스','브러쉬드 드럼','뮤트 트럼펫','해먼드 오르간'],
+  '테크노':['신디사이저','808 드럼 머신','아르프 신스','모듈러 신스'],
+  '쿰비아':['쿰비아 퍼커션','아코디언','기타','베이스'],
+  '블루스':['일렉트릭 기타','하모니카','피아노','드럼 브러쉬'],
+  '아마피아노':['로그 드럼','피아노','베이스라인','신스'],
+  '에티오재즈':['색소폰','비브라폰','아프리칸 퍼커션','업라이트 베이스'],
+  '팀바':['콩가','팀발레스','피아노','트럼펫','베이스'],
+};
+const INSTR_BY_GENRE_EN = {
+  '삼바':['Latin Percussion','Nylon Guitar','Cavaquinho','Pandeiro','Agogo'],
+  '보사노바':['Nylon Guitar','Upright Bass','Brushed Drums','Cavaquinho'],
+  'K-Pop':['808 Bass','Synth Lead','Electronic Drums','String Section','Vocoder'],
+  '레게':['Rhythm Guitar','Bass','Horn Section','Organ','Echo Guitar'],
+  '살사':['Timbales','Congas','Trumpet','Piano','Bass','Maracas'],
+  '플라멩코':['Spanish Guitar','Cajon','Handclaps','Castanets'],
+  '탱고':['Bandoneón','Violin','Piano','Double Bass'],
+  '힙합':['808 Bass','SP-404 Sampler','Hi-Hat','Synth Pad'],
+  '재즈':['Upright Bass','Brushed Drums','Muted Trumpet','Hammond Organ'],
+  '테크노':['Synthesizer','808 Drum Machine','Arp Synth','Modular Synth'],
+  '쿰비아':['Cumbia Percussion','Accordion','Guitar','Bass'],
+  '블루스':['Electric Guitar','Harmonica','Piano','Drum Brushes'],
+  '아마피아노':['Log Drum','Piano','Bassline','Synth'],
+  '에티오재즈':['Saxophone','Vibraphone','African Percussion','Upright Bass'],
+  '팀바':['Congas','Timbales','Piano','Trumpet','Bass'],
+};
+
+const VOCALS_KO = ['남성 보컬','여성 보컬','듀엣','합창','랩 보컬','팔세토','속삭이는 보컬','열정적인 보컬','부드러운 보컬','거친 보컬','무보컬(연주곡)','소울풀한 보컬','오페라틱 보컬','인디 보컬','그루브 보컬','알앤비 보컬','컨트리 보컬','록 보컬','팝 보컬','재즈 보컬'];
+const VOCALS_EN = ['Male Vocal','Female Vocal','Duet','Choir','Rap Vocal','Falsetto','Whisper Vocal','Passionate Vocal','Smooth Vocal','Gritty Vocal','No Vocal (Instrumental)','Soulful Vocal','Operatic Vocal','Indie Vocal','Groove Vocal','R&B Vocal','Country Vocal','Rock Vocal','Pop Vocal','Jazz Vocal'];
+
+const EXTRAS_KO = ['그루브 벌스와 챈트 코러스','콜앤리스폰스 구조','극적인 전조','스포큰 워드 브릿지','아카펠라 구간','점점 사라지는 엔딩','갑작스러운 정지 엔딩','리드믹 반복','에테리얼 리버브 테일','레이어드 하모닉스','드라마틱 빌드업','루프 기반 구조','라이브 세션 느낌','빈티지 테이프 질감','헤비 베이스라인','미니멀 어레인지먼트','오케스트라 스웰','글리치 효과','시네마틱 인트로','다이나믹 드롭'];
+const EXTRAS_EN = ['groove verse and chant-like chorus','call and response structure','dramatic key change','spoken word bridge','a cappella section','fade out ending','sudden stop ending','rhythmic repetition','ethereal reverb tail','layered harmonics','dramatic build-up','loop-based structure','live session feel','vintage tape texture','heavy bassline','minimal arrangement','orchestral swell','glitch effects','cinematic intro','dynamic drop'];
+
+const STORIES_KO = [
+  {id:'chase', label:'꿈을 향한 질주', en:'chasing dreams with the reckless heart of youth'},
+  {id:'loss',  label:'이별 후의 밤',   en:'the quiet heartbreak after goodbye'},
+  {id:'city',  label:'도시의 불빛',    en:'lost in the neon glow of a midnight city'},
+  {id:'rise',  label:'역경을 넘어',    en:'rising from the ashes of a broken past'},
+  {id:'love',  label:'첫사랑의 기억',  en:'the bittersweet memory of first love'},
+  {id:'free',  label:'자유를 향해',    en:'running toward the horizon of endless freedom'},
+  {id:'alone', label:'혼자만의 시간',  en:'finding peace in the solitude of being alone'},
+  {id:'war',   label:'전쟁과 생존',    en:'surviving the chaos of a world on fire'},
+  {id:'nature',label:'자연의 품으로',  en:'returning to the raw beauty of the natural world'},
+  {id:'night', label:'새벽의 감성',    en:'drifting through the quiet hours before dawn'},
+  {id:'dance', label:'춤추는 밤',      en:'losing yourself on the dance floor under flashing lights'},
+  {id:'road',  label:'로드트립',       en:'chasing the open road with nowhere to be'},
+  {id:'ghost', label:'사라진 것들',    en:'haunted by the ghosts of what could have been'},
+  {id:'home',  label:'고향의 그리움',  en:'longing for the warmth of a home left behind'},
+  {id:'rise2', label:'나의 전성기',    en:'standing at the peak of power and glory'},
+  {id:'rain',  label:'빗속의 고독',    en:'wandering alone in the rain with nowhere to go'},
+  {id:'custom',label:'직접 입력',      en:''},
 ];
+
+const BPM_PRESETS = [
+  {ko:'감성 발라드', bpm:65, desc:'느리고 깊은 감정'},
+  {ko:'느린 R&B',   bpm:75, desc:'무거운 그루브'},
+  {ko:'R&B / 힙합', bpm:86, desc:'그루브 중심'},
+  {ko:'미드 그루브', bpm:92, desc:'자연스러운 흐름'},
+  {ko:'인디 팝',    bpm:98, desc:'산뜻한 중간 템포'},
+  {ko:'팝',         bpm:104,desc:'메인스트림 흐름'},
+  {ko:'업비트 팝',  bpm:112,desc:'경쾌한 에너지'},
+  {ko:'EDM / 댄스', bpm:120,desc:'추진감 있는 전개'},
+  {ko:'하우스',     bpm:128,desc:'클럽 친화적 에너지'},
+  {ko:'트랩',       bpm:140,desc:'강한 드롭과 펀치감'},
+  {ko:'드럼앤베이스',bpm:160,desc:'매우 빠른 질주감'},
+  {ko:'정글',       bpm:170,desc:'극한의 속도'},
+];
+
+const MODIFIERS_KO = ['더 감성적으로','더 에너제틱하게','더 시네마틱하게','더 미니멀하게','더 어둡게','더 밝게','더 몽환적으로','더 거칠게'];
+const MODIFIERS_EN = ['more emotional','more energetic','more cinematic','more minimal','darker','brighter','more dreamy','more raw and gritty'];
 
 const TAB_NAMES = ['스타일','스토리','분위기','템포','악기','보컬','기타'];
 
+// ─── STATE ───
 let S = {
   tab:0, region:null, country:null, genre:null,
   stories:[], moods:[], bpm:107, bpmPreset:null,
@@ -264,73 +330,77 @@ let S = {
   extras:[], modifiers:[], copied:false,
 };
 
+// ─── PROMPT BUILDER (영문 출력) ───
 function buildPrompt(mods=[]) {
   const parts = [];
-  if (S.genre) parts.push(S.genre);
-  if (S.moods.length) parts.push(...S.moods);
+  if (S.genre) parts.push(GENRE_EN[S.genre] || S.genre);
+  S.moods.forEach(m => { const i=MOODS_KO.indexOf(m); parts.push(i>=0?MOODS_EN[i]:m); });
   if (S.bpm) parts.push(S.bpm + ' BPM');
-  if (S.instruments.length) parts.push(...S.instruments);
-  if (S.vocal) parts.push(S.vocal);
-  const storyParts = S.stories.map(id => {
-    const st = STORIES.find(x => x.id === id);
-    return st?.id === 'custom' ? S.customStory : st?.en;
-  }).filter(Boolean);
-  if (storyParts.length) parts.push(...storyParts.map(p => 'about ' + p));
-  if (S.extras.length) parts.push(...S.extras);
-  if (mods.length) parts.push(...mods.map(m => m.toLowerCase().replace('more ','') + ' feel'));
+  S.instruments.forEach(inst => {
+    const bi = INSTR_BASE_KO.indexOf(inst);
+    if (bi>=0) { parts.push(INSTR_BASE_EN[bi]); return; }
+    const genre = Object.keys(INSTR_BY_GENRE_KO).find(g => INSTR_BY_GENRE_KO[g].includes(inst));
+    if (genre) { const gi=INSTR_BY_GENRE_KO[genre].indexOf(inst); parts.push(INSTR_BY_GENRE_EN[genre][gi]); return; }
+    parts.push(inst);
+  });
+  if (S.vocal) { const vi=VOCALS_KO.indexOf(S.vocal); parts.push(vi>=0?VOCALS_EN[vi]:S.vocal); }
+  S.stories.forEach(id => {
+    const st = STORIES_KO.find(x=>x.id===id);
+    const val = st?.id==='custom' ? S.customStory : st?.en;
+    if (val) parts.push('about ' + val);
+  });
+  S.extras.forEach(e => { const ei=EXTRAS_KO.indexOf(e); parts.push(ei>=0?EXTRAS_EN[ei]:e); });
+  if (mods.length) mods.forEach(m => { const mi=MODIFIERS_KO.indexOf(m); if(mi>=0) parts.push(MODIFIERS_EN[mi]); });
   return parts.join(', ');
 }
 
 function getStatus() {
-  const filled = [S.genre, S.moods.length, S.bpm, S.instruments.length, S.vocal].filter(Boolean).length;
-  if (filled === 0) return {type:'empty', msg:'왼쪽 패널에서 항목을 선택하면 프롬프트가 생성됩니다.'};
-  if (S.moods.length === 1) return {type:'warn', msg:'무드를 2개 이상 고르면 더 자연스러운 프롬프트가 됩니다.'};
-  if (filled >= 4) return {type:'ok', msg:'현재 조합은 비교적 안정적입니다.'};
-  return {type:'warn', msg:'더 많은 항목을 선택할수록 풍부한 프롬프트가 완성됩니다.'};
+  const filled = [S.genre,S.moods.length,S.bpm,S.instruments.length,S.vocal].filter(Boolean).length;
+  if (filled===0) return {type:'empty',msg:'왼쪽 패널에서 항목을 선택하면 영문 프롬프트가 생성됩니다.'};
+  if (S.moods.length===1) return {type:'warn',msg:'무드를 2개 이상 고르면 더 자연스러운 프롬프트가 됩니다.'};
+  if (filled>=4) return {type:'ok',msg:'현재 조합은 비교적 안정적입니다.'};
+  return {type:'warn',msg:'더 많은 항목을 선택할수록 풍부한 프롬프트가 완성됩니다.'};
 }
 
 function isDone(i) {
-  return [!!S.genre, S.stories.length>0, S.moods.length>0, !!S.bpm, S.instruments.length>0, !!S.vocal, S.extras.length>0][i];
+  return [!!S.genre,S.stories.length>0,S.moods.length>0,!!S.bpm,S.instruments.length>0,!!S.vocal,S.extras.length>0][i];
 }
 
-function h(tag, cls, html, attrs='') {
-  return `<${tag} class="${cls}" ${attrs}>${html}</${tag}>`;
-}
-
+// ─── RENDER ───
 function renderTabs() {
-  document.getElementById('tabStrip').innerHTML = TAB_NAMES.map((n,i) => {
-    const cls = S.tab===i ? 'tab active' : isDone(i) ? 'tab done' : 'tab';
+  document.getElementById('tabStrip').innerHTML = TAB_NAMES.map((n,i)=>{
+    const cls=S.tab===i?'tab active':isDone(i)?'tab done':'tab';
     return `<button class="${cls}" onclick="setTab(${i})"><span class="check">✓</span>${i+1} ${n}</button>`;
   }).join('');
 }
 
 function renderLeft() {
+  let html = `<div class="panel-title">${TAB_NAMES[S.tab]}</div>`;
   const t = S.tab;
-  let html = `<div class="panel-title">${TAB_NAMES[t]}</div>`;
 
-  if (t === 0) {
-    const countries = S.region ? (DATA.countries[S.region]||[]) : [];
-    const genres = S.country ? (DATA.genres[S.country]||[]) : [];
+  if (t===0) {
+    const countries = S.region?(COUNTRIES[S.region]||[]):[];
+    const genres = S.country?(GENRES[S.country]||[]):[];
     html += `<div class="section-label">1. 지역 선택</div><div class="btn-grid">
-      ${DATA.regions.map(r=>`<button class="sel-btn ${S.region===r?'selected':''}" onclick="setRegion('${r}')">${r}</button>`).join('')}
+      ${REGIONS.map(r=>`<button class="sel-btn ${S.region===r?'selected':''}" onclick="setRegion('${r}')">${r}</button>`).join('')}
     </div>
     <div class="section-label">2. 국가 선택</div><div class="btn-grid">
-      ${S.region ? countries.map(c=>`<button class="sel-btn ${S.country===c?'selected':''}" onclick="setCountry('${c}')">${c}</button>`).join('') : '<span style="font-size:12px;color:var(--text3)">지역을 먼저 선택하세요</span>'}
+      ${S.region?countries.map(c=>`<button class="sel-btn ${S.country===c?'selected':''}" onclick="setCountry('${c}')">${c}</button>`).join(''):'<span style="font-size:12px;color:var(--text3)">지역을 먼저 선택하세요</span>'}
     </div>
     <div class="section-label">3. 장르 선택</div><div class="btn-grid">
-      ${S.country ? genres.map(g=>`<button class="sel-btn ${S.genre===g?'selected':''}" onclick="setGenre('${g}')">${g}</button>`).join('') : '<span style="font-size:12px;color:var(--text3)">국가를 먼저 선택하세요</span>'}
+      ${S.country?genres.map(g=>`<button class="sel-btn ${S.genre===g?'selected':''}" onclick="setGenre('${r(g)}')">${g}</button>`).join(''):'<span style="font-size:12px;color:var(--text3)">국가를 먼저 선택하세요</span>'}
     </div>`;
-  } else if (t === 1) {
+  } else if (t===1) {
     html += `<div class="section-label">스토리 테마 (복수 선택)</div><div class="btn-grid">
-      ${STORIES.map(s=>`<button class="sel-btn ${S.stories.includes(s.id)?'selected':''}" onclick="toggleStory('${s.id}')">${s.label}</button>`).join('')}
+      ${STORIES_KO.map(s=>`<button class="sel-btn ${S.stories.includes(s.id)?'selected':''}" onclick="toggleStory('${s.id}')">${s.label}</button>`).join('')}
     </div>
-    ${S.stories.includes('custom') ? `<div class="section-label" style="margin-top:14px">직접 입력 (영문 권장)</div>
-      <textarea class="text-inp" placeholder="e.g. a journey through forgotten memories" oninput="setCustom(this.value)">${S.customStory}</textarea>` : ''}`;
-  } else if (t === 2) {
+    ${S.stories.includes('custom')?`<div class="section-label" style="margin-top:14px">직접 입력 (영문 권장)</div>
+      <textarea class="text-inp" placeholder="e.g. a journey through forgotten memories" oninput="setCustom(this.value)">${S.customStory}</textarea>`:''}`;
+  } else if (t===2) {
     html += `<div class="section-label">분위기 (복수 선택)</div><div class="btn-grid">
-      ${DATA.moods.map(m=>`<button class="sel-btn ${S.moods.includes(m)?'selected':''}" onclick="toggleMood('${m}')">${m}</button>`).join('')}
+      ${MOODS_KO.map(m=>`<button class="sel-btn ${S.moods.includes(m)?'selected':''}" onclick="toggleMood('${m}')">${m}</button>`).join('')}
     </div>`;
-  } else if (t === 3) {
+  } else if (t===3) {
     html += `<div class="bpm-display">${S.bpm}<span>BPM</span></div>
     <input type="range" class="bpm-slider" min="40" max="200" step="1" value="${S.bpm}" oninput="setBpm(+this.value)">
     <div class="bpm-input-row">
@@ -338,26 +408,27 @@ function renderLeft() {
       <span class="bpm-hint">직접 입력 가능</span>
     </div>
     <div class="preset-grid">
-      ${DATA.bpmPresets.map((p,i)=>`<div class="preset-card ${S.bpmPreset===i?'selected':''}" onclick="setBpmPreset(${i},${p.bpm})">
-        <div class="preset-name">${p.name}</div>
+      ${BPM_PRESETS.map((p,i)=>`<div class="preset-card ${S.bpmPreset===i?'selected':''}" onclick="setBpmPreset(${i},${p.bpm})">
+        <div class="preset-name">${p.ko}</div>
         <div class="preset-bpm">${p.bpm} BPM</div>
         <div class="preset-desc">${p.desc}</div>
       </div>`).join('')}
     </div>`;
-  } else if (t === 4) {
-    const extra = S.genre && DATA.instruments.byGenre[S.genre] ? DATA.instruments.byGenre[S.genre] : [];
-    const all = [...new Set([...extra, ...DATA.instruments.base])];
-    html += (extra.length ? `<div class="genre-hint">✦ ${S.genre} 추천 악기</div>` : '') +
+  } else if (t===4) {
+    const genreKey = S.genre && INSTR_BY_GENRE_KO[S.genre] ? S.genre : null;
+    const extra = genreKey ? INSTR_BY_GENRE_KO[genreKey] : [];
+    const all = [...new Set([...extra, ...INSTR_BASE_KO])];
+    html += (extra.length?`<div class="genre-hint">✦ ${S.genre} 추천 악기 포함</div>`:'') +
       `<div class="section-label">악기 (복수 선택)</div><div class="btn-grid">
-        ${all.map(inst=>`<button class="sel-btn ${S.instruments.includes(inst)?'selected':''}" onclick="toggleInst('${inst.replace(/'/g,"\\'")}')">${inst}</button>`).join('')}
+        ${all.map(inst=>`<button class="sel-btn ${S.instruments.includes(inst)?'selected':''}" onclick="toggleInst(${JSON.stringify(inst)})">${inst}</button>`).join('')}
       </div>`;
-  } else if (t === 5) {
+  } else if (t===5) {
     html += `<div class="section-label">보컬 스타일</div><div class="btn-grid">
-      ${DATA.vocals.map(v=>`<button class="sel-btn ${S.vocal===v?'selected':''}" onclick="setVocal('${v}')">${v}</button>`).join('')}
+      ${VOCALS_KO.map(v=>`<button class="sel-btn ${S.vocal===v?'selected':''}" onclick="setVocal(${JSON.stringify(v)})">${v}</button>`).join('')}
     </div>`;
-  } else if (t === 6) {
+  } else if (t===6) {
     html += `<div class="section-label">기타 사항 (복수 선택)</div><div class="btn-grid">
-      ${DATA.extras.map(e=>`<button class="sel-btn ${S.extras.includes(e)?'selected':''}" onclick="toggleExtra(${JSON.stringify(e)})">${e}</button>`).join('')}
+      ${EXTRAS_KO.map(e=>`<button class="sel-btn ${S.extras.includes(e)?'selected':''}" onclick="toggleExtra(${JSON.stringify(e)})">${e}</button>`).join('')}
     </div>`;
   }
 
@@ -368,25 +439,24 @@ function renderLeft() {
 function renderMid() {
   const st = getStatus();
   const storyText = S.stories.map(id=>{
-    const s = STORIES.find(x=>x.id===id);
-    return s?.id==='custom' ? S.customStory||'...' : s?.label;
-  }).filter(Boolean).join(', ') || '-';
+    const s=STORIES_KO.find(x=>x.id===id);
+    return s?.id==='custom'?S.customStory||'...':s?.label;
+  }).filter(Boolean).join(', ')||'-';
 
   const rows = [
-    {k:'스타일', v:[S.region,S.country,S.genre].filter(Boolean).join(' / ') || '-'},
+    {k:'스타일', v:[S.region,S.country,S.genre].filter(Boolean).join(' › ')||'-'},
     {k:'스토리', v:storyText},
-    {k:'분위기', v:S.moods.join(', ') || '-'},
-    {k:'템포',   v:S.bpm, bpm:true},
-    {k:'악기',   v:S.instruments.join(', ') || '-'},
-    {k:'보컬',   v:S.vocal || '-'},
-    {k:'기타',   v:S.extras.join(', ') || '-'},
-    {k:'EQ',    v:'Flat (프롬프트 미반영)'},
+    {k:'분위기', v:S.moods.join(', ')||'-'},
+    {k:'템포',   v:S.bpm+' BPM', bpm:true},
+    {k:'악기',   v:S.instruments.join(', ')||'-'},
+    {k:'보컬',   v:S.vocal||'-'},
+    {k:'기타',   v:S.extras.join(', ')||'-'},
   ];
 
   document.getElementById('midPanel').innerHTML = `
     <div class="mid-header">
       <div class="panel-title" style="margin:0">선택 요약</div>
-      <button class="save-btn" onclick="saveExcel()">↓ 엑셀 저장</button>
+      <button class="save-btn" onclick="saveCSV()">↓ CSV 저장</button>
     </div>
     <div class="status-badge status-${st.type}">${st.msg}</div>
     ${rows.map(r=>`<div class="sum-row">
@@ -403,38 +473,38 @@ function renderRight() {
 
   document.getElementById('rightPanel').innerHTML = `
     <div class="mid-header">
-      <div class="panel-title" style="margin:0">전체 프롬프트</div>
-      <button class="save-btn" onclick="saveExcel()">↓ 엑셀</button>
+      <div class="panel-title" style="margin:0">전체 프롬프트 (영문)</div>
     </div>
-    <div class="prompt-box ${prompt?'':'empty'}">${prompt || '선택 항목이 없습니다.'}</div>
+    <div class="prompt-box ${prompt?'':'empty'}">${prompt||'선택 항목이 없습니다.'}</div>
     <div class="char-count"><span class="${charCount>200?'over':''}">${charCount}</span> / 200자</div>
     <button class="copy-btn ${S.copied?'copied':''}" onclick="copyPrompt()">${S.copied?'✓ 복사됨':'클립보드 저장'}</button>
-    <div>
-      <div class="mod-title">변형 프롬프트</div>
-      <div class="mod-grid">
-        ${DATA.modifiers.map(m=>`<button class="mod-btn ${S.modifiers.includes(m)?'active':''}" onclick="toggleMod('${m}')">${m}</button>`).join('')}
-      </div>
-      ${modPrompt ? `<div class="mod-result">${modPrompt}</div>` : ''}
-    </div>`;
+    <div class="mod-title">변형 프롬프트</div>
+    <div class="mod-grid">
+      ${MODIFIERS_KO.map((m,i)=>`<button class="mod-btn ${S.modifiers.includes(m)?'active':''}" onclick="toggleMod(${JSON.stringify(m)})">${m}</button>`).join('')}
+    </div>
+    ${modPrompt?`<div class="mod-result">${modPrompt}</div>`:''}`;
 }
 
 function render() { renderTabs(); renderLeft(); renderMid(); renderRight(); }
 
-// HANDLERS
-function setTab(i) { S.tab=i; render(); }
-function setRegion(r) { S.region=r; S.country=null; S.genre=null; render(); }
-function setCountry(c) { S.country=c; S.genre=null; render(); }
-function setGenre(g) { S.genre=g; render(); }
-function toggleStory(id) { S.stories=S.stories.includes(id)?S.stories.filter(x=>x!==id):[...S.stories,id]; render(); }
-function setCustom(v) { S.customStory=v; }
-function toggleMood(m) { S.moods=S.moods.includes(m)?S.moods.filter(x=>x!==m):[...S.moods,m]; render(); }
-function setBpm(v) { S.bpm=v; S.bpmPreset=null; render(); }
-function setBpmPreset(i,bpm) { S.bpm=bpm; S.bpmPreset=i; render(); }
-function toggleInst(inst) { S.instruments=S.instruments.includes(inst)?S.instruments.filter(x=>x!==inst):[...S.instruments,inst]; render(); }
-function setVocal(v) { S.vocal=v; render(); }
-function toggleExtra(e) { S.extras=S.extras.includes(e)?S.extras.filter(x=>x!==e):[...S.extras,e]; render(); }
-function toggleMod(m) { S.modifiers=S.modifiers.includes(m)?S.modifiers.filter(x=>x!==m):[...S.modifiers,m]; render(); }
-function resetTab() {
+// ─── 특수문자 이스케이프 ───
+function r(s){ return s.replace(/'/g,"\\'"); }
+
+// ─── HANDLERS ───
+function setTab(i){S.tab=i;render();}
+function setRegion(v){S.region=v;S.country=null;S.genre=null;render();}
+function setCountry(v){S.country=v;S.genre=null;render();}
+function setGenre(v){S.genre=v;render();}
+function toggleStory(id){S.stories=S.stories.includes(id)?S.stories.filter(x=>x!==id):[...S.stories,id];render();}
+function setCustom(v){S.customStory=v;}
+function toggleMood(m){S.moods=S.moods.includes(m)?S.moods.filter(x=>x!==m):[...S.moods,m];render();}
+function setBpm(v){S.bpm=v;S.bpmPreset=null;render();}
+function setBpmPreset(i,bpm){S.bpm=bpm;S.bpmPreset=i;render();}
+function toggleInst(inst){S.instruments=S.instruments.includes(inst)?S.instruments.filter(x=>x!==inst):[...S.instruments,inst];render();}
+function setVocal(v){S.vocal=v;render();}
+function toggleExtra(e){S.extras=S.extras.includes(e)?S.extras.filter(x=>x!==e):[...S.extras,e];render();}
+function toggleMod(m){S.modifiers=S.modifiers.includes(m)?S.modifiers.filter(x=>x!==m):[...S.modifiers,m];render();}
+function resetTab(){
   const t=S.tab;
   if(t===0){S.region=null;S.country=null;S.genre=null;}
   else if(t===1){S.stories=[];S.customStory='';}
@@ -445,32 +515,30 @@ function resetTab() {
   else if(t===6){S.extras=[];}
   render();
 }
-function copyPrompt() {
-  const p = buildPrompt(S.modifiers);
-  if (!p) return;
+function copyPrompt(){
+  const p=buildPrompt(S.modifiers);
+  if(!p)return;
   navigator.clipboard.writeText(p).then(()=>{
-    S.copied=true; render();
-    setTimeout(()=>{ S.copied=false; render(); }, 2000);
+    S.copied=true;render();
+    setTimeout(()=>{S.copied=false;render();},2000);
   });
 }
-function saveExcel() {
-  const rows = [
-    ['카테고리','값','영문 프롬프트'],
-    ['스타일',[S.region,S.country,S.genre].filter(Boolean).join(' / '),S.genre||''],
-    ['분위기',S.moods.join(', '),S.moods.join(', ')],
-    ['템포',S.bpm+' BPM',S.bpm+' BPM'],
-    ['악기',S.instruments.join(', '),S.instruments.join(', ')],
-    ['보컬',S.vocal||'',S.vocal||''],
-    ['기타',S.extras.join(', '),S.extras.join(', ')],
+function saveCSV(){
+  const rows=[
+    ['카테고리','선택값 (한글)','영문 프롬프트'],
+    ['스타일',[S.region,S.country,S.genre].filter(Boolean).join(' › '),GENRE_EN[S.genre]||S.genre||''],
+    ['분위기',S.moods.join(', '),S.moods.map(m=>{const i=MOODS_KO.indexOf(m);return i>=0?MOODS_EN[i]:m;}).join(', ')],
+    ['템포',S.bpm+'BPM',S.bpm+' BPM'],
+    ['악기',S.instruments.join(', '),S.instruments.map(inst=>{const bi=INSTR_BASE_KO.indexOf(inst);if(bi>=0)return INSTR_BASE_EN[bi];const g=Object.keys(INSTR_BY_GENRE_KO).find(g=>INSTR_BY_GENRE_KO[g].includes(inst));if(g){const gi=INSTR_BY_GENRE_KO[g].indexOf(inst);return INSTR_BY_GENRE_EN[g][gi];}return inst;}).join(', ')],
+    ['보컬',S.vocal||'',S.vocal?(VOCALS_EN[VOCALS_KO.indexOf(S.vocal)]||S.vocal):''],
+    ['기타',S.extras.join(', '),S.extras.map(e=>{const ei=EXTRAS_KO.indexOf(e);return ei>=0?EXTRAS_EN[ei]:e;}).join(', ')],
     ['','',''],
     ['최종 프롬프트','',buildPrompt()],
   ];
-  const csv = rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
-  const blob = new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'suno-prompt-'+Date.now()+'.csv';
-  a.click();
+  const csv=rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='suno-prompt-'+Date.now()+'.csv';a.click();
 }
 
 render();
