@@ -325,7 +325,7 @@ const TAB_NAMES = ['스타일','스토리','분위기','템포','악기','보컬
 // ─── STATE ───
 let S = {
   tab:0, region:null, country:null, genre:null,
-  stories:[], moods:[], bpm:107, bpmPreset:null,
+  stories:[], moods:[], bpm:107, bpmPreset:null, bpmTouched:false,
   instruments:[], vocal:null, customStory:'',
   extras:[], modifiers:[], copied:false,
 };
@@ -363,7 +363,7 @@ function getStatus() {
 }
 
 function isDone(i) {
-  return [!!S.genre,S.stories.length>0,S.moods.length>0,!!S.bpm,S.instruments.length>0,!!S.vocal,S.extras.length>0][i];
+  return [!!S.genre,S.stories.length>0,S.moods.length>0,S.bpmTouched,S.instruments.length>0,!!S.vocal,S.extras.length>0][i];
 }
 
 // ─── RENDER ───
@@ -498,8 +498,8 @@ function setGenre(v){S.genre=v;render();}
 function toggleStory(id){S.stories=S.stories.includes(id)?S.stories.filter(x=>x!==id):[...S.stories,id];render();}
 function setCustom(v){S.customStory=v;}
 function toggleMood(m){S.moods=S.moods.includes(m)?S.moods.filter(x=>x!==m):[...S.moods,m];render();}
-function setBpm(v){S.bpm=v;S.bpmPreset=null;render();}
-function setBpmPreset(i,bpm){S.bpm=bpm;S.bpmPreset=i;render();}
+function setBpm(v){S.bpm=v;S.bpmPreset=null;S.bpmTouched=true;render();}
+function setBpmPreset(i,bpm){S.bpm=bpm;S.bpmPreset=i;S.bpmTouched=true;render();}
 function toggleInst(inst){S.instruments=S.instruments.includes(inst)?S.instruments.filter(x=>x!==inst):[...S.instruments,inst];render();}
 function setVocal(v){S.vocal=v;render();}
 function toggleExtra(e){S.extras=S.extras.includes(e)?S.extras.filter(x=>x!==e):[...S.extras,e];render();}
@@ -509,7 +509,7 @@ function resetTab(){
   if(t===0){S.region=null;S.country=null;S.genre=null;}
   else if(t===1){S.stories=[];S.customStory='';}
   else if(t===2){S.moods=[];}
-  else if(t===3){S.bpm=107;S.bpmPreset=null;}
+  else if(t===3){S.bpm=107;S.bpmPreset=null;S.bpmTouched=false;}
   else if(t===4){S.instruments=[];}
   else if(t===5){S.vocal=null;}
   else if(t===6){S.extras=[];}
