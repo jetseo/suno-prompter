@@ -91,6 +91,25 @@
     .mod-btn.active{background:rgba(0,184,255,0.1);border-color:var(--accent2);color:var(--accent2);}
     .mod-result{margin-top:10px;background:var(--surface2);border:1px solid rgba(0,184,255,0.2);border-radius:8px;padding:11px;font-family:var(--mono);font-size:10px;color:var(--text);line-height:1.6;word-break:break-word;}
     .genre-hint{font-size:11px;color:var(--accent);margin-bottom:8px;}
+    /* TOOLTIP */
+    .tip-wrap{position:relative;display:inline-block;}
+    .tip-wrap .tooltip{
+      visibility:hidden;opacity:0;
+      position:absolute;bottom:calc(100% + 7px);left:50%;
+      transform:translateX(-50%) translateY(3px);
+      background:#1c2a38;border:1px solid rgba(0,229,160,0.22);
+      color:#a0b4c8;font-size:11px;font-family:var(--sans);line-height:1.5;
+      padding:7px 10px;border-radius:7px;
+      width:max-content;max-width:200px;white-space:normal;
+      box-shadow:0 4px 16px rgba(0,0,0,0.55);
+      pointer-events:none;transition:opacity 0.15s,transform 0.15s;
+      z-index:9999;
+    }
+    .tip-wrap:hover .tooltip{visibility:visible;opacity:1;transform:translateX(-50%) translateY(0);}
+    .tip-wrap .tooltip::after{
+      content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);
+      border:5px solid transparent;border-top-color:#1c2a38;
+    }
     #resetAllBtn{background:none;border:1px solid var(--border);color:var(--text3);font-size:11px;font-family:var(--sans);padding:6px 14px;border-radius:6px;cursor:pointer;transition:all 0.15s;}
     #resetAllBtn:hover{border-color:var(--accent3);color:var(--accent3);}
   </style>
@@ -287,24 +306,173 @@ const VOCALS_EN = ['Male Vocal','Female Vocal','Duet','Choir','Rap Vocal','False
 const EXTRAS_KO = ['그루브 벌스와 챈트 코러스','콜앤리스폰스 구조','극적인 전조','스포큰 워드 브릿지','아카펠라 구간','점점 사라지는 엔딩','갑작스러운 정지 엔딩','리드믹 반복','에테리얼 리버브 테일','레이어드 하모닉스','드라마틱 빌드업','루프 기반 구조','라이브 세션 느낌','빈티지 테이프 질감','헤비 베이스라인','미니멀 어레인지먼트','오케스트라 스웰','글리치 효과','시네마틱 인트로','다이나믹 드롭'];
 const EXTRAS_EN = ['groove verse and chant-like chorus','call and response structure','dramatic key change','spoken word bridge','a cappella section','fade out ending','sudden stop ending','rhythmic repetition','ethereal reverb tail','layered harmonics','dramatic build-up','loop-based structure','live session feel','vintage tape texture','heavy bassline','minimal arrangement','orchestral swell','glitch effects','cinematic intro','dynamic drop'];
 
+
+// ─── 툴팁 설명 데이터 ───
+const REGION_DESC = {
+  '아시아':'한국·일본·인도 등 동아시아·남아시아의 다채로운 음악 스타일',
+  '유럽':'클래식부터 일렉트로닉까지, 유럽 각국의 독자적인 사운드',
+  '북미':'힙합·R&B·컨트리·재즈 등 세계 팝 음악의 중심지',
+  '남미':'삼바·탱고·레게톤 등 리듬감 넘치는 라틴 음악',
+  '아프리카':'아프로비트·하이라이프·아마피아노 등 대지의 에너지',
+  '오세아니아':'하와이·마오리 전통부터 인디팝까지 태평양 사운드',
+  '중동':'마캄·아랍팝·페르시안팝 등 신비로운 중동 선율',
+};
+
+const MOOD_DESC = {
+  '열정적인':'불타오르는 감정과 강렬한 에너지감',
+  '애수 어린':'가슴 한켠에 남는 쓸쓸하고 아련한 감성',
+  '황홀한':'기쁨과 흥분이 최고조에 달한 황홀경',
+  '어두운':'그림자와 긴장감이 감도는 어두운 분위기',
+  '향수 어린':'지나간 시절을 그리워하는 노스탤지어',
+  '따뜻한':'포근하고 안심되는 온기 있는 분위기',
+  '몽환적인':'현실과 꿈의 경계를 떠도는 환상적 느낌',
+  '공격적인':'강하고 직선적인 파워풀한 에너지',
+  '평화로운':'조용하고 고요한 안정감',
+  '신비로운':'알 수 없는 매력과 미지의 느낌',
+  '낭만적인':'사랑스럽고 감미로운 로맨틱한 감성',
+  '에너제틱한':'활기차고 넘치는 생동감',
+  '우울한':'무겁고 침울한 감정의 흐름',
+  '기쁜':'밝고 행복한 유쾌한 에너지',
+  '긴장감 있는':'숨막히는 서스펜스와 긴박함',
+  '차분한':'잔잔하고 절제된 성숙한 분위기',
+  '거칠고 날것의':'가공되지 않은 날것의 거친 에너지',
+  '웅장한':'스케일 크고 압도적인 장엄함',
+  '잔잔한':'물결처럼 부드럽고 조용히 흐르는 느낌',
+  '관능적인':'은근하고 매혹적인 감각적 분위기',
+  '순수한':'꾸밈없이 맑고 투명한 감성',
+  '외로운':'혼자라는 감정, 고독과 쓸쓸함',
+  '희망찬':'앞을 향해 나아가는 밝은 기대감',
+  '드라마틱한':'극적 반전과 고조가 있는 영화적 긴장',
+  '불안한':'불확실함과 초조함이 배어있는 감성',
+  '유쾌한':'장난기 넘치고 가볍게 즐거운 느낌',
+};
+
+const VOCAL_DESC = {
+  '남성 보컬':'낮고 중후한 남성의 목소리',
+  '여성 보컬':'섬세하고 맑은 여성의 목소리',
+  '듀엣':'남녀 또는 동성 두 보컬의 조화',
+  '합창':'여러 목소리가 어우러진 코러스',
+  '랩 보컬':'리드믹한 라임과 플로우 중심의 보컬',
+  '팔세토':'두성을 활용한 높고 가느다란 보컬',
+  '속삭이는 보컬':'귀에 속삭이듯 부드럽고 친밀한 보컬',
+  '열정적인 보컬':'감정을 터뜨리는 강렬하고 뜨거운 보컬',
+  '부드러운 보컬':'매끄럽고 유연하게 흐르는 편안한 보컬',
+  '거친 보컬':'허스키하고 그루브 있는 날것의 목소리',
+  '무보컬(연주곡)':'보컬 없이 악기만으로 구성된 순수 연주',
+  '소울풀한 보컬':'감정이 충만한 소울과 R&B 느낌의 보컬',
+  '오페라틱 보컬':'클래식 성악 기법이 적용된 웅장한 보컬',
+  '인디 보컬':'개성 있고 자연스러운 인디 감성의 목소리',
+  '그루브 보컬':'리듬을 타는 신체적 그루브감이 있는 보컬',
+  '알앤비 보컬':'멜리스마와 감성이 풍부한 R&B 창법',
+  '컨트리 보컬':'구수하고 진솔한 컨트리 음악 특유의 목소리',
+  '록 보컬':'에너지 넘치고 파워풀한 록 창법',
+  '팝 보컬':'깔끔하고 상업적으로 매력적인 팝 보컬',
+  '재즈 보컬':'즉흥성과 스윙이 담긴 재즈 창법',
+};
+
+const INSTR_BASE_DESC = {
+  '피아노':'88개의 건반, 클래식에서 팝까지 가장 범용적인 악기',
+  '기타':'6현 통기타, 따뜻하고 어쿠스틱한 사운드',
+  '베이스 기타':'저음역을 담당하는 일렉트릭 베이스',
+  '드럼':'킥·스네어·심벌로 이루어진 리듬의 중심',
+  '바이올린':'현악기 중 가장 높은 음역, 섬세하고 표현력 풍부',
+  '첼로':'깊고 풍부한 저중음역의 현악기',
+  '트럼펫':'화려하고 밝은 금관악기의 대표',
+  '색소폰':'재즈·블루스의 상징, 감성적인 목관악기',
+  '신디사이저':'전자 음향을 만들어내는 키보드 악기',
+  '일렉트릭 기타':'앰프와 이펙터로 다양한 사운드를 내는 전기 기타',
+  '어쿠스틱 기타':'앰프 없이 울리는 따뜻한 나무 기타',
+  '플루트':'맑고 청아한 고음역의 목관악기',
+  '오보에':'독특하고 코맹맹이 같은 따뜻한 목관악기',
+  '클라리넷':'부드럽고 따뜻한 음색의 목관악기',
+  '하프':'천상의 소리, 줄을 퉁겨 연주하는 현악기',
+  '비올라':'바이올린보다 깊고 따뜻한 중음역 현악기',
+  '더블베이스':'현악기 중 가장 낮은 음역의 대형 악기',
+  '밴조':'미국 민속·블루그래스의 상징적인 발현악기',
+  '만돌린':'이탈리아 기원의 소형 발현악기, 밝고 경쾌한 음색',
+  '우쿨렐레':'하와이 기원의 소형 4현 기타, 경쾌하고 따뜻함',
+  '하모니카':'입으로 불고 마시며 연주하는 소형 관악기',
+  '아코디언':'리드와 벨로우즈로 연주하는 버튼·건반 악기',
+  '멜로트론':'테이프 기반의 빈티지 키보드, 현악·합창 사운드',
+  '로즈 피아노':'전기 피아노, 따뜻하고 부드러운 재즈·소울 사운드',
+  '오르간':'파이프 또는 전기 방식의 웅장한 건반 악기',
+  '무그 신스':'아날로그 신스의 아버지, 두꺼운 따뜻한 음색',
+  '페달 스틸':'컨트리·하와이안 음악의 상징, 슬라이드 기타',
+  '현악 4중주':'바이올린 2·비올라·첼로의 클래식 앙상블',
+  '오케스트라 스트링스':'수십 명의 현악기 섹션, 웅장하고 풍성한 사운드',
+  '브라스 섹션':'트럼펫·트롬본·색소폰의 풍성한 관악 앙상블',
+};
+
+const EXTRAS_DESC = {
+  '그루브 벌스와 챈트 코러스':'벌스는 리드믹한 그루브로, 코러스는 함께 따라 부르기 쉬운 챈트로 구성',
+  '콜앤리스폰스 구조':'보컬이나 악기 간에 주고받는 대화형 구조',
+  '극적인 전조':'곡 중간 키가 갑자기 바뀌어 극적 효과를 주는 기법',
+  '스포큰 워드 브릿지':'노래 대신 말로 전달하는 내레이션 형식의 브릿지',
+  '아카펠라 구간':'악기 없이 목소리만으로 구성된 무반주 구간',
+  '점점 사라지는 엔딩':'볼륨이 서서히 줄어들며 자연스럽게 끝나는 페이드 아웃',
+  '갑작스러운 정지 엔딩':'예고 없이 갑자기 끝나는 강렬한 엔딩',
+  '리드믹 반복':'특정 리듬이나 구절이 반복되며 최면적 효과를 냄',
+  '에테리얼 리버브 테일':'긴 잔향으로 공간감과 몽환적인 여운을 줌',
+  '레이어드 하모닉스':'여러 음들이 겹쳐 풍부한 화성을 만들어내는 효과',
+  '드라마틱 빌드업':'점점 고조되어 절정으로 이르는 긴장감 있는 전개',
+  '루프 기반 구조':'반복되는 루프 패턴을 기반으로 한 구성',
+  '라이브 세션 느낌':'스튜디오가 아닌 실제 연주 현장의 생생한 느낌',
+  '빈티지 테이프 질감':'아날로그 테이프 특유의 따뜻하고 약간 흐린 음색',
+  '헤비 베이스라인':'묵직하게 존재감을 드러내는 강조된 저음',
+  '미니멀 어레인지먼트':'불필요한 요소를 걷어낸 간결하고 공간감 있는 편곡',
+  '오케스트라 스웰':'현악·금관이 함께 부풀어오르는 장엄한 크레셴도',
+  '글리치 효과':'디지털 오류처럼 끊기고 왜곡되는 실험적 사운드',
+  '시네마틱 인트로':'영화 오프닝처럼 분위기를 잡아주는 인상적인 인트로',
+  '다이나믹 드롭':'빌드업 이후 터지는 강렬한 드롭 구간',
+};
+
+const MODIFIER_DESC = {
+  '더 감성적으로':'감정의 강도와 표현력을 높이고 싶을 때',
+  '더 에너제틱하게':'템포와 활기를 끌어올려 더 역동적으로',
+  '더 시네마틱하게':'영화 음악처럼 스케일 있고 드라마틱하게',
+  '더 미니멀하게':'요소를 줄이고 공간감과 여백을 살리게',
+  '더 어둡게':'분위기를 더 어둡고 긴장감 있게',
+  '더 밝게':'밝고 경쾌한 방향으로',
+  '더 몽환적으로':'현실감을 줄이고 몽환적인 질감을 더하게',
+  '더 거칠게':'거칠고 날것의 에너지를 극대화',
+};
+
+// ─── 툴팁 헬퍼 ───
+function tip(label, desc) {
+  if (!desc) return `<button`;
+  return `<div class="tip-wrap"><button`;
+}
+function tipClose(desc) {
+  if (!desc) return '';
+  return `<span class="tooltip">${desc}</span></div>`;
+}
+
+// 버튼 + 툴팁을 한번에 생성하는 헬퍼
+function makeBtn(cls, onclick, label, desc) {
+  if (desc) {
+    return `<div class="tip-wrap"><button class="${cls}" ${onclick}>${label}</button><span class="tooltip">${desc}</span></div>`;
+  }
+  return `<button class="${cls}" ${onclick}>${label}</button>`;
+}
+
 const STORIES_KO = [
-  {id:'chase', label:'꿈을 향한 질주', en:'chasing dreams with the reckless heart of youth'},
-  {id:'loss',  label:'이별 후의 밤',   en:'the quiet heartbreak after goodbye'},
-  {id:'city',  label:'도시의 불빛',    en:'lost in the neon glow of a midnight city'},
-  {id:'rise',  label:'역경을 넘어',    en:'rising from the ashes of a broken past'},
-  {id:'love',  label:'첫사랑의 기억',  en:'the bittersweet memory of first love'},
-  {id:'free',  label:'자유를 향해',    en:'running toward the horizon of endless freedom'},
-  {id:'alone', label:'혼자만의 시간',  en:'finding peace in the solitude of being alone'},
-  {id:'war',   label:'전쟁과 생존',    en:'surviving the chaos of a world on fire'},
-  {id:'nature',label:'자연의 품으로',  en:'returning to the raw beauty of the natural world'},
-  {id:'night', label:'새벽의 감성',    en:'drifting through the quiet hours before dawn'},
-  {id:'dance', label:'춤추는 밤',      en:'losing yourself on the dance floor under flashing lights'},
-  {id:'road',  label:'로드트립',       en:'chasing the open road with nowhere to be'},
-  {id:'ghost', label:'사라진 것들',    en:'haunted by the ghosts of what could have been'},
-  {id:'home',  label:'고향의 그리움',  en:'longing for the warmth of a home left behind'},
-  {id:'rise2', label:'나의 전성기',    en:'standing at the peak of power and glory'},
-  {id:'rain',  label:'빗속의 고독',    en:'wandering alone in the rain with nowhere to go'},
-  {id:'custom',label:'직접 입력',      en:''},
+  {id:'chase', label:'꿈을 향한 질주', en:'chasing dreams with the reckless heart of youth',       desc:'젊음의 무모함으로 꿈을 향해 달려가는 이야기'},
+  {id:'loss',  label:'이별 후의 밤',   en:'the quiet heartbreak after goodbye',                    desc:'이별 이후 홀로 맞이하는 조용하고 아픈 밤'},
+  {id:'city',  label:'도시의 불빛',    en:'lost in the neon glow of a midnight city',              desc:'자정의 도시 네온 불빛 속에 길을 잃은 감성'},
+  {id:'rise',  label:'역경을 넘어',    en:'rising from the ashes of a broken past',                desc:'부서진 과거를 딛고 다시 일어서는 이야기'},
+  {id:'love',  label:'첫사랑의 기억',  en:'the bittersweet memory of first love',                  desc:'달콤하고도 쓴 첫사랑의 기억'},
+  {id:'free',  label:'자유를 향해',    en:'running toward the horizon of endless freedom',         desc:'끝없는 자유의 지평선을 향해 달리는 이야기'},
+  {id:'alone', label:'혼자만의 시간',  en:'finding peace in the solitude of being alone',          desc:'고독 속에서 찾아내는 평화와 나만의 시간'},
+  {id:'war',   label:'전쟁과 생존',    en:'surviving the chaos of a world on fire',                desc:'불타는 세상에서 살아남으려는 처절한 이야기'},
+  {id:'nature',label:'자연의 품으로',  en:'returning to the raw beauty of the natural world',      desc:'자연의 날것 그대로의 아름다움으로 돌아가는 여정'},
+  {id:'night', label:'새벽의 감성',    en:'drifting through the quiet hours before dawn',          desc:'새벽 여명 전 고요한 시간을 떠도는 몽상'},
+  {id:'dance', label:'춤추는 밤',      en:'losing yourself on the dance floor under flashing lights',desc:'화려한 조명 아래 자신을 잃고 춤추는 밤'},
+  {id:'road',  label:'로드트립',       en:'chasing the open road with nowhere to be',              desc:'목적지 없이 열린 도로를 달리는 자유로운 여행'},
+  {id:'ghost', label:'사라진 것들',    en:'haunted by the ghosts of what could have been',         desc:'있었을 수도 있는 것들의 유령에 홀린 감성'},
+  {id:'home',  label:'고향의 그리움',  en:'longing for the warmth of a home left behind',          desc:'떠나온 고향의 따뜻함을 그리워하는 마음'},
+  {id:'rise2', label:'나의 전성기',    en:'standing at the peak of power and glory',               desc:'권력과 영광의 정점에 서있는 순간'},
+  {id:'rain',  label:'빗속의 고독',    en:'wandering alone in the rain with nowhere to go',        desc:'갈 곳 없이 빗속을 혼자 걷는 고독'},
+  {id:'custom',label:'직접 입력',      en:'',                                                      desc:'원하는 스토리를 직접 영문으로 입력'},
 ];
 
 const BPM_PRESETS = [
@@ -387,7 +555,7 @@ function renderLeft() {
     const countries = S.region?(COUNTRIES[S.region]||[]):[];
     const genres = S.country?(GENRES[S.country]||[]):[];
     html += `<div class="section-label">1. 지역 선택</div><div class="btn-grid">
-      ${REGIONS.map(r=>`<button class="sel-btn ${S.region===r?'selected':''}" onclick="setRegion('${r}')">${r}</button>`).join('')}
+      ${REGIONS.map(r=>makeBtn(`sel-btn ${S.region===r?'selected':''}`,`onclick="setRegion('${r}')"`,r,REGION_DESC[r]||'')).join('')}
     </div>
     <div class="section-label">2. 국가 선택</div><div class="btn-grid">
       ${S.region?countries.map(c=>`<button class="sel-btn ${S.country===c?'selected':''}" onclick="setCountry('${c}')">${c}</button>`).join(''):'<span style="font-size:12px;color:var(--text3)">지역을 먼저 선택하세요</span>'}
@@ -397,13 +565,13 @@ function renderLeft() {
     </div>`;
   } else if (t===1) {
     html += `<div class="section-label">스토리 테마 (복수 선택)</div><div class="btn-grid">
-      ${STORIES_KO.map(s=>`<button class="sel-btn ${S.stories.includes(s.id)?'selected':''}" onclick="toggleStory('${s.id}')">${s.label}</button>`).join('')}
+      ${STORIES_KO.map(s=>makeBtn(`sel-btn ${S.stories.includes(s.id)?'selected':''}`,`onclick="toggleStory('${s.id}')"`,s.label,s.desc||'')).join('')}
     </div>
     ${S.stories.includes('custom')?`<div class="section-label" style="margin-top:14px">직접 입력 (영문 권장)</div>
       <textarea class="text-inp" placeholder="e.g. a journey through forgotten memories" oninput="setCustom(this.value)">${S.customStory}</textarea>`:''}`;
   } else if (t===2) {
     html += `<div class="section-label">분위기 (복수 선택)</div><div class="btn-grid">
-      ${MOODS_KO.map(m=>`<button class="sel-btn ${S.moods.includes(m)?'selected':''}" onclick="toggleMood('${m}')">${m}</button>`).join('')}
+      ${MOODS_KO.map(m=>makeBtn(`sel-btn ${S.moods.includes(m)?'selected':''}`,`onclick="toggleMood('${m}')"`,m,MOOD_DESC[m]||'')).join('')}
     </div>`;
   } else if (t===3) {
     html += `<div class="bpm-display">${S.bpm}<span>BPM</span></div>
@@ -425,15 +593,15 @@ function renderLeft() {
     const all = [...new Set([...extra, ...INSTR_BASE_KO])];
     html += (extra.length?`<div class="genre-hint">✦ ${S.genre} 추천 악기 포함</div>`:'') +
       `<div class="section-label">악기 (복수 선택)</div><div class="btn-grid">
-        ${all.map((inst,idx)=>`<button class="sel-btn ${S.instruments.includes(inst)?'selected':''}" onclick="toggleInstByEl(this)" data-val="${inst}">${inst}</button>`).join('')}
+        ${all.map(inst=>{ const desc=INSTR_BASE_DESC[inst]||''; const cls=`sel-btn ${S.instruments.includes(inst)?'selected':''}`; const att=`onclick="toggleInstByEl(this)" data-val="${inst}"`; return makeBtn(cls,att,inst,desc); }).join('')}
       </div>`;
   } else if (t===5) {
     html += `<div class="section-label">보컬 스타일</div><div class="btn-grid">
-      ${VOCALS_KO.map((v,i)=>`<button class="sel-btn ${S.vocal===v?'selected':''}" onclick="setVocalIdx(${i})">${v}</button>`).join('')}
+      ${VOCALS_KO.map((v,i)=>makeBtn(`sel-btn ${S.vocal===v?'selected':''}`,`onclick="setVocalIdx(${i})"`,v,VOCAL_DESC[v]||'')).join('')}
     </div>`;
   } else if (t===6) {
     html += `<div class="section-label">기타 사항 (복수 선택)</div><div class="btn-grid">
-      ${EXTRAS_KO.map((e,i)=>`<button class="sel-btn ${S.extras.includes(e)?'selected':''}" onclick="toggleExtraIdx(${i})">${e}</button>`).join('')}
+      ${EXTRAS_KO.map((e,i)=>makeBtn(`sel-btn ${S.extras.includes(e)?'selected':''}`,`onclick="toggleExtraIdx(${i})"`,e,EXTRAS_DESC[e]||'')).join('')}
     </div>`;
   }
 
@@ -485,7 +653,7 @@ function renderRight() {
     <button class="copy-btn ${S.copied?'copied':''}" onclick="copyPrompt()">${S.copied?'✓ 복사됨':'클립보드 저장'}</button>
     <div class="mod-title">변형 프롬프트</div>
     <div class="mod-grid">
-      ${MODIFIERS_KO.map((m,i)=>`<button class="mod-btn ${S.modifiers.includes(m)?'active':''}" onclick="toggleModIdx(${i})">${m}</button>`).join('')}
+      ${MODIFIERS_KO.map((m,i)=>makeBtn(`mod-btn ${S.modifiers.includes(m)?'active':''}`,`onclick="toggleModIdx(${i})"`,m,MODIFIER_DESC[m]||'')).join('')}
     </div>
     ${modPrompt?`<div class="mod-result">${modPrompt}</div>`:''}`;
 }
