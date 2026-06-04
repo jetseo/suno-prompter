@@ -91,6 +91,8 @@
     .mod-btn.active{background:rgba(0,184,255,0.1);border-color:var(--accent2);color:var(--accent2);}
     .mod-result{margin-top:10px;background:var(--surface2);border:1px solid rgba(0,184,255,0.2);border-radius:8px;padding:11px;font-family:var(--mono);font-size:10px;color:var(--text);line-height:1.6;word-break:break-word;}
     .genre-hint{font-size:11px;color:var(--accent);margin-bottom:8px;}
+    #resetAllBtn{background:none;border:1px solid var(--border);color:var(--text3);font-size:11px;font-family:var(--sans);padding:6px 14px;border-radius:6px;cursor:pointer;transition:all 0.15s;}
+    #resetAllBtn:hover{border-color:var(--accent3);color:var(--accent3);}
   </style>
 </head>
 <body>
@@ -102,7 +104,10 @@
       <div class="logo-sub">선택형 AI 음악 프롬프트 빌더</div>
     </div>
   </div>
-  <div style="font-family:var(--mono);font-size:11px;color:var(--text3)">v2.0</div>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <div style="font-family:var(--mono);font-size:11px;color:var(--text3)">v2.0</div>
+    <button id="resetAllBtn" onclick="resetAll()">전체 초기화</button>
+  </div>
 </div>
 <div class="tab-strip" id="tabStrip"></div>
 <div class="main">
@@ -420,15 +425,15 @@ function renderLeft() {
     const all = [...new Set([...extra, ...INSTR_BASE_KO])];
     html += (extra.length?`<div class="genre-hint">✦ ${S.genre} 추천 악기 포함</div>`:'') +
       `<div class="section-label">악기 (복수 선택)</div><div class="btn-grid">
-        ${all.map(inst=>`<button class="sel-btn ${S.instruments.includes(inst)?'selected':''}" onclick="toggleInst(${JSON.stringify(inst)})">${inst}</button>`).join('')}
+        ${all.map((inst,idx)=>`<button class="sel-btn ${S.instruments.includes(inst)?'selected':''}" onclick="toggleInstByEl(this)" data-val="${inst}">${inst}</button>`).join('')}
       </div>`;
   } else if (t===5) {
     html += `<div class="section-label">보컬 스타일</div><div class="btn-grid">
-      ${VOCALS_KO.map(v=>`<button class="sel-btn ${S.vocal===v?'selected':''}" onclick="setVocal(${JSON.stringify(v)})">${v}</button>`).join('')}
+      ${VOCALS_KO.map((v,i)=>`<button class="sel-btn ${S.vocal===v?'selected':''}" onclick="setVocalIdx(${i})">${v}</button>`).join('')}
     </div>`;
   } else if (t===6) {
     html += `<div class="section-label">기타 사항 (복수 선택)</div><div class="btn-grid">
-      ${EXTRAS_KO.map(e=>`<button class="sel-btn ${S.extras.includes(e)?'selected':''}" onclick="toggleExtra(${JSON.stringify(e)})">${e}</button>`).join('')}
+      ${EXTRAS_KO.map((e,i)=>`<button class="sel-btn ${S.extras.includes(e)?'selected':''}" onclick="toggleExtraIdx(${i})">${e}</button>`).join('')}
     </div>`;
   }
 
@@ -480,7 +485,7 @@ function renderRight() {
     <button class="copy-btn ${S.copied?'copied':''}" onclick="copyPrompt()">${S.copied?'✓ 복사됨':'클립보드 저장'}</button>
     <div class="mod-title">변형 프롬프트</div>
     <div class="mod-grid">
-      ${MODIFIERS_KO.map((m,i)=>`<button class="mod-btn ${S.modifiers.includes(m)?'active':''}" onclick="toggleMod(${JSON.stringify(m)})">${m}</button>`).join('')}
+      ${MODIFIERS_KO.map((m,i)=>`<button class="mod-btn ${S.modifiers.includes(m)?'active':''}" onclick="toggleModIdx(${i})">${m}</button>`).join('')}
     </div>
     ${modPrompt?`<div class="mod-result">${modPrompt}</div>`:''}`;
 }
@@ -500,10 +505,19 @@ function setCustom(v){S.customStory=v;}
 function toggleMood(m){S.moods=S.moods.includes(m)?S.moods.filter(x=>x!==m):[...S.moods,m];render();}
 function setBpm(v){S.bpm=v;S.bpmPreset=null;S.bpmTouched=true;render();}
 function setBpmPreset(i,bpm){S.bpm=bpm;S.bpmPreset=i;S.bpmTouched=true;render();}
+function toggleInstByEl(el){const inst=el.dataset.val;S.instruments=S.instruments.includes(inst)?S.instruments.filter(x=>x!==inst):[...S.instruments,inst];render();}
 function toggleInst(inst){S.instruments=S.instruments.includes(inst)?S.instruments.filter(x=>x!==inst):[...S.instruments,inst];render();}
+function toggleInstIdx(idx, val){toggleInst(val||'');}
 function setVocal(v){S.vocal=v;render();}
+function setVocalIdx(i){S.vocal=VOCALS_KO[i];render();}
 function toggleExtra(e){S.extras=S.extras.includes(e)?S.extras.filter(x=>x!==e):[...S.extras,e];render();}
+function toggleExtraIdx(i){toggleExtra(EXTRAS_KO[i]);}
 function toggleMod(m){S.modifiers=S.modifiers.includes(m)?S.modifiers.filter(x=>x!==m):[...S.modifiers,m];render();}
+function toggleModIdx(i){toggleMod(MODIFIERS_KO[i]);}
+function resetAll(){
+  S={tab:S.tab,region:null,country:null,genre:null,stories:[],moods:[],bpm:107,bpmPreset:null,bpmTouched:false,instruments:[],vocal:null,customStory:'',extras:[],modifiers:[],copied:false};
+  render();
+}
 function resetTab(){
   const t=S.tab;
   if(t===0){S.region=null;S.country=null;S.genre=null;}
