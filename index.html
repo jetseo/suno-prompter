@@ -321,6 +321,13 @@
       <div class="rowVal" id="jitterAmtVal">0%</div>
     </div>
     <div class="smartHint" style="display:block; margin-top:12px;">✦ 완전한 보컬 분리가 아닌, 보컬이 주로 위치하는 중역대(250Hz~4kHz)에만 적용됩니다. 베이스·킥·심벌 등은 거의 영향받지 않습니다.</div>
+    <div class="row" style="margin-top:14px;">
+      <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+        <input type="checkbox" id="stemSeparate" style="width:auto;">
+        <span>🧬 실제 AI 스템 분리 사용 (베타)</span>
+      </label>
+    </div>
+    <div class="smartHint" style="display:block; margin-top:8px;">✦ 브라우저에서 직접 신경망 모델(약 57MB, 최초 1회만 다운로드 후 캐시됨)을 실행해 보컬/반주를 실제로 분리한 뒤 각각 처리합니다. 서버 업로드는 없지만 곡 길이에 따라 수 분~수십 분이 걸릴 수 있고, 실패 시 위의 대역 제한 근사 방식으로 자동 전환됩니다.</div>
   </div>
 
   <!-- 4. Character 프리셋 & EQ -->
@@ -1121,6 +1128,289 @@
     return w;
   }
 
+  // ================= Bluestein FFT (arbitrary length) =================
+  // The stem-separation model needs n_fft=5120, which isn't a power of 2,
+  // so the radix-2 fftInPlace above can't be used directly. Bluestein's
+  // algorithm reduces an arbitrary-length N-point DFT to a convolution,
+  // computed via the existing power-of-2 fftInPlace as the core primitive.
+  // Verified against numpy.fft.fft to ~1e-13 absolute error, and the full
+  // STFT/model/ISTFT round-trip verified against a PyTorch reference to
+  // correlation 0.9999999999999943 (see models/README.md).
+  function nextPow2(n){ let p=1; while(p<n) p*=2; return p; }
+  const bluesteinCache = {};
+  function getBluesteinPlan(N){
+    if(bluesteinCache[N]) return bluesteinCache[N];
+    const M = nextPow2(2*N-1);
+    const wRe = new Float64Array(N), wIm = new Float64Array(N);
+    for(let n=0;n<N;n++){
+      const nn = (n*n) % (2*N);
+      const ang = -Math.PI*nn/N;
+      wRe[n]=Math.cos(ang); wIm[n]=Math.sin(ang);
+    }
+    const bRe = new Float64Array(M), bIm = new Float64Array(M);
+    bRe[0]=wRe[0]; bIm[0]=-wIm[0];
+    for(let n=1;n<N;n++){
+      bRe[n]=wRe[n]; bIm[n]=-wIm[n];
+      bRe[M-n]=wRe[n]; bIm[M-n]=-wIm[n];
+    }
+    fftInPlace(bRe, bIm, false);
+    const plan = {N, M, wRe, wIm, Bre:bRe, Bim:bIm};
+    bluesteinCache[N] = plan;
+    return plan;
+  }
+  // in-place-ish: xRe/xIm (length N) -> returns [outRe, outIm] (length N)
+  function bluesteinTransform(plan, xRe, xIm, inverse){
+    const {N,M,wRe,wIm,Bre,Bim} = plan;
+    const aRe = new Float64Array(M), aIm = new Float64Array(M);
+    const sign = inverse ? 1 : -1;
+    for(let n=0;n<N;n++){
+      const wr = wRe[n], wi = sign>0 ? -wIm[n] : wIm[n];
+      aRe[n] = xRe[n]*wr - xIm[n]*wi;
+      aIm[n] = xRe[n]*wi + xIm[n]*wr;
+    }
+    fftInPlace(aRe, aIm, false);
+    const cRe = new Float64Array(M), cIm = new Float64Array(M);
+    for(let i=0;i<M;i++){
+      const br = Bre[i], bi = inverse ? -Bim[i] : Bim[i];
+      cRe[i] = aRe[i]*br - aIm[i]*bi;
+      cIm[i] = aRe[i]*bi + aIm[i]*br;
+    }
+    fftInPlace(cRe, cIm, true);
+    const outRe = new Float64Array(N), outIm = new Float64Array(N);
+    for(let k=0;k<N;k++){
+      const wr = wRe[k], wi = inverse ? -wIm[k] : wIm[k];
+      outRe[k] = cRe[k]*wr - cIm[k]*wi;
+      outIm[k] = cRe[k]*wi + cIm[k]*wr;
+    }
+    if(inverse){ for(let k=0;k<N;k++){ outRe[k]/=N; outIm[k]/=N; } }
+    return [outRe, outIm];
+  }
+
+  // ================= MDX-Net STFT/ISTFT (matches torch.stft/istft exactly) =================
+  // Config fixed by the vendored model's I/O contract — see models/README.md.
+  const MDX_N_FFT = 5120, MDX_HOP = 1024, MDX_DIM_F = 2560, MDX_DIM_T = 256, MDX_COMPENSATE = 1.01;
+  const MDX_OVERLAP = 0.25, MDX_SR = 44100;
+  const MDX_N_BINS = MDX_N_FFT/2 + 1;
+  let mdxWindowCache = null;
+  function mdxHannWindow(){
+    if(mdxWindowCache) return mdxWindowCache;
+    const w = new Float32Array(MDX_N_FFT);
+    for(let i=0;i<MDX_N_FFT;i++) w[i] = 0.5 - 0.5*Math.cos(2*Math.PI*i/MDX_N_FFT); // periodic, matches torch.hann_window(periodic=True)
+    mdxWindowCache = w;
+    return w;
+  }
+  // reflect-pad matching numpy/torch's default reflect mode (edge sample not repeated)
+  function reflectPad(x, padLeft, padRight){
+    const n = x.length;
+    const out = new Float32Array(n + padLeft + padRight);
+    for(let i=0;i<padLeft;i++) out[i] = x[padLeft - i];
+    out.set(x, padLeft);
+    for(let i=0;i<padRight;i++) out[padLeft + n + i] = x[n - 2 - i];
+    return out;
+  }
+  // STFT of one channel -> {re,im}: arrays of MDX_DIM_F Float32Arrays (each length numFrames), cropped/zeroed per model contract
+  function mdxStftChannel(x){
+    const plan = getBluesteinPlan(MDX_N_FFT);
+    const window = mdxHannWindow();
+    const padded = reflectPad(x, MDX_N_FFT/2, MDX_N_FFT/2);
+    const numFrames = 1 + Math.floor((padded.length - MDX_N_FFT) / MDX_HOP);
+    const re = new Array(MDX_DIM_F), im = new Array(MDX_DIM_F);
+    for(let f=0; f<MDX_DIM_F; f++){ re[f] = new Float32Array(numFrames); im[f] = new Float32Array(numFrames); }
+    const frameRe = new Float64Array(MDX_N_FFT), frameIm = new Float64Array(MDX_N_FFT);
+    for(let t=0; t<numFrames; t++){
+      const start = t*MDX_HOP;
+      for(let i=0;i<MDX_N_FFT;i++){ frameRe[i] = padded[start+i]*window[i]; frameIm[i] = 0; }
+      const [Xre, Xim] = bluesteinTransform(plan, frameRe, frameIm, false);
+      for(let f=0; f<MDX_DIM_F; f++){
+        // model contract zeroes the first 3 bins (reduces low-frequency noise)
+        re[f][t] = f<3 ? 0 : Xre[f];
+        im[f][t] = f<3 ? 0 : Xim[f];
+      }
+    }
+    return { re, im, numFrames };
+  }
+  // Inverse STFT: re,im are MDX_DIM_F x numFrames -> real waveform, length (numFrames-1)*hop+n_fft, UNTRIMMED
+  function mdxIstftChannelRaw(re, im, numFrames){
+    const plan = getBluesteinPlan(MDX_N_FFT);
+    const window = mdxHannWindow();
+    const outLen = (numFrames-1)*MDX_HOP + MDX_N_FFT;
+    const overlapBuf = new Float64Array(outLen);
+    const windowSumSq = new Float64Array(outLen);
+    const frameRe = new Float64Array(MDX_N_FFT), frameIm = new Float64Array(MDX_N_FFT);
+    for(let t=0; t<numFrames; t++){
+      frameRe.fill(0); frameIm.fill(0);
+      for(let f=0; f<MDX_N_BINS; f++){
+        const rv = f<MDX_DIM_F ? re[f][t] : 0;
+        const iv = f<MDX_DIM_F ? im[f][t] : 0;
+        frameRe[f]=rv; frameIm[f]=iv;
+        if(f>0 && f<MDX_N_FFT-f){ const mirror = MDX_N_FFT-f; frameRe[mirror]=rv; frameIm[mirror]=-iv; }
+      }
+      const [xre] = bluesteinTransform(plan, frameRe, frameIm, true);
+      const start = t*MDX_HOP;
+      for(let i=0;i<MDX_N_FFT;i++){
+        const wv = window[i];
+        overlapBuf[start+i] += xre[i]*wv;
+        windowSumSq[start+i] += wv*wv;
+      }
+    }
+    const out = new Float32Array(outLen);
+    for(let i=0;i<outLen;i++) out[i] = windowSumSq[i]>1e-11 ? overlapBuf[i]/windowSumSq[i] : 0;
+    return out;
+  }
+  function mdxIstftChannel(re, im, numFrames){
+    const raw = mdxIstftChannelRaw(re, im, numFrames);
+    const trim = MDX_N_FFT/2;
+    return raw.slice(trim, raw.length-trim); // torch.istft(center=True) trims n_fft/2 off each side
+  }
+
+  // ================= AI stem separation (ONNX Runtime Web, same-origin vendored, no third-party CDN) =================
+  let mdxSessionPromise = null;
+  async function ensureOrtLoaded(){
+    if(window.ort) return;
+    await new Promise((resolve, reject)=>{
+      const s = document.createElement('script');
+      s.src = 'vendor/ort/ort.wasm.min.js';
+      s.onload = resolve;
+      s.onerror = ()=>reject(new Error('ONNX Runtime 로드 실패'));
+      document.head.appendChild(s);
+    });
+    if(!window.ort) throw new Error('ONNX Runtime 로드 실패');
+    ort.env.wasm.numThreads = 1;
+  }
+  function ensureMdxSession(onStatus){
+    if(!mdxSessionPromise){
+      mdxSessionPromise = (async ()=>{
+        if(onStatus) onStatus('AI 모델 런타임 불러오는 중...');
+        await ensureOrtLoaded();
+        if(onStatus) onStatus('스템 분리 모델(약 57MB) 다운로드 중... (최초 1회만)');
+        return await ort.InferenceSession.create('models/UVR-MDX-NET-Inst_HQ_5.onnx', { executionProviders: ['wasm'] });
+      })().catch(err=>{ mdxSessionPromise = null; throw err; }); // allow retry on next call after a failure
+    }
+    return mdxSessionPromise;
+  }
+
+  // Resamples via the browser's native (high-quality) OfflineAudioContext resampler —
+  // the MDX model was trained at a fixed 44.1kHz and requires matching input.
+  async function resampleTo(channels, fromRate, toRate){
+    if(fromRate === toRate) return channels;
+    const len = channels[0].length;
+    const outLen = Math.max(1, Math.ceil(len * toRate / fromRate));
+    const offlineCtx = new OfflineAudioContext(channels.length, outLen, toRate);
+    const srcBuf = offlineCtx.createBuffer(channels.length, len, fromRate);
+    channels.forEach((ch,i)=> srcBuf.copyToChannel(ch, i));
+    const src = offlineCtx.createBufferSource();
+    src.buffer = srcBuf;
+    src.connect(offlineCtx.destination);
+    src.start();
+    const rendered = await offlineCtx.startRendering();
+    const out = [];
+    for(let c=0;c<channels.length;c++) out.push(rendered.getChannelData(c).slice());
+    return out;
+  }
+
+  // Runs one fixed-size (chunkSize-sample) stereo chunk through STFT -> ONNX model -> ISTFT.
+  async function runMdxChunk(session, Lchunk, Rchunk){
+    const stftL = mdxStftChannel(Lchunk);
+    const stftR = mdxStftChannel(Rchunk);
+    const total = 4*MDX_DIM_F*MDX_DIM_T;
+    const inputData = new Float32Array(total);
+    function writeCh(chIdx, arr2d){
+      for(let f=0; f<MDX_DIM_F; f++){
+        const row = arr2d[f];
+        const base = chIdx*MDX_DIM_F*MDX_DIM_T + f*MDX_DIM_T;
+        for(let t=0; t<MDX_DIM_T; t++) inputData[base+t] = row[t];
+      }
+    }
+    writeCh(0, stftL.re); writeCh(1, stftL.im); writeCh(2, stftR.re); writeCh(3, stftR.im);
+    const inputTensor = new ort.Tensor('float32', inputData, [1,4,MDX_DIM_F,MDX_DIM_T]);
+    const results = await session.run({ input: inputTensor });
+    const outData = results[session.outputNames[0]].data;
+    function extractOutCh(chIdx){
+      const arr2d = new Array(MDX_DIM_F);
+      const base = chIdx*MDX_DIM_F*MDX_DIM_T;
+      for(let f=0; f<MDX_DIM_F; f++){
+        const row = new Float32Array(MDX_DIM_T);
+        const rowBase = base + f*MDX_DIM_T;
+        for(let t=0; t<MDX_DIM_T; t++) row[t] = outData[rowBase+t];
+        arr2d[f] = row;
+      }
+      return arr2d;
+    }
+    const outL = mdxIstftChannel(extractOutCh(0), extractOutCh(1), MDX_DIM_T);
+    const outR = mdxIstftChannel(extractOutCh(2), extractOutCh(3), MDX_DIM_T);
+    return { L: outL, R: outR };
+  }
+
+  // Full-track chunked overlap-add separation, matching audio-separator's MDXSeparator.demix()
+  // exactly (25% overlap, Hann crossfade windowing, divider-array normalization). Returns the
+  // instrumental stem directly from the model, and derives vocals via mix - instrumental*compensate
+  // (the reference's default invert_using_spec=False path) rather than a second model pass.
+  async function separateStemsFull(channels, fs, onProgress){
+    const Lin = channels[0], Rin = channels.length>1 ? channels[1] : channels[0];
+    const resampled = await resampleTo([Lin, Rin], fs, MDX_SR);
+    const L = resampled[0], R = resampled[1];
+    const origLen = L.length;
+
+    const trim = MDX_N_FFT/2; // 2560
+    const chunkSize = MDX_HOP*(MDX_DIM_T-1); // 261120
+    const genSize = chunkSize - 2*trim; // 256000
+    const pad = genSize + trim - (origLen % genSize);
+    const mixLen = trim + origLen + pad;
+
+    const mixL = new Float32Array(mixLen), mixR = new Float32Array(mixLen);
+    mixL.set(L, trim); mixR.set(R, trim);
+
+    const step = Math.round((1-MDX_OVERLAP)*chunkSize); // 195840
+    const resultL = new Float32Array(mixLen), resultR = new Float32Array(mixLen);
+    const divider = new Float32Array(mixLen);
+    const totalChunks = Math.ceil(mixLen/step);
+
+    const session = await ensureMdxSession(msg => onProgress && onProgress(0, msg));
+
+    let chunkIdx = 0;
+    for(let i=0; i<mixLen; i+=step){
+      chunkIdx++;
+      const start = i, end = Math.min(i+chunkSize, mixLen);
+      const chunkActual = end-start;
+      const window = getHann(chunkActual);
+
+      let Lc = mixL.subarray(start, end), Rc = mixR.subarray(start, end);
+      if(chunkActual < chunkSize){
+        const Lp = new Float32Array(chunkSize), Rp = new Float32Array(chunkSize);
+        Lp.set(Lc); Rp.set(Rc);
+        Lc = Lp; Rc = Rp;
+      }
+      if(onProgress) onProgress(chunkIdx/totalChunks, '🧬 AI 스템 분리 중... 청크 '+chunkIdx+'/'+totalChunks);
+      const out = await runMdxChunk(session, Lc, Rc);
+      for(let k=0;k<chunkActual;k++){
+        const w = window[k];
+        resultL[start+k] += out.L[k]*w;
+        resultR[start+k] += out.R[k]*w;
+        divider[start+k] += w;
+      }
+      await yieldUI();
+    }
+
+    const instL = new Float32Array(origLen), instR = new Float32Array(origLen);
+    for(let i=0;i<origLen;i++){
+      const idx = trim+i, d = divider[idx];
+      instL[i] = d>1e-8 ? resultL[idx]/d : 0;
+      instR[i] = d>1e-8 ? resultR[idx]/d : 0;
+    }
+    const vocL = new Float32Array(origLen), vocR = new Float32Array(origLen);
+    for(let i=0;i<origLen;i++){
+      vocL[i] = L[i] - instL[i]*MDX_COMPENSATE;
+      vocR[i] = R[i] - instR[i]*MDX_COMPENSATE;
+    }
+
+    let vocalsOut = [vocL, vocR], instOut = [instL, instR];
+    if(MDX_SR !== fs){
+      vocalsOut = await resampleTo(vocalsOut, MDX_SR, fs);
+      instOut = await resampleTo(instOut, MDX_SR, fs);
+    }
+    return { vocals: vocalsOut, instrumental: instOut };
+  }
+
   // Detects and attenuates narrowband spectral spikes above ~5kHz that are
   // characteristic of AI vocoder / diffusion-model artifacts (comb-like ringing,
   // metallic warble) — distinct from natural broadband harmonic content.
@@ -1388,15 +1678,49 @@
       log('[02] 고역 노이즈 억제 적용 ('+Math.round(noiseAmt*100)+'%) — 10.5kHz '+peakCutDb.toFixed(1)+'dB, 13kHz+ shelf '+shelfCutDb.toFixed(1)+'dB');
     }
 
-    // 3) 보컬 새츄레이션 & 지터 (250Hz~4kHz 대역 제한 근사 — 완전한 스템 분리 아님)
+    // 3) 보컬 새츄레이션 & 지터 — 실제 AI 스템 분리(베타) 또는 250Hz~4kHz 대역 제한 근사
     const satAmt = parseFloat($('satAmt').value)/100;
     const jitterAmt = parseFloat($('jitterAmt').value)/100;
+    const useStemSep = $('stemSeparate').checked;
     if(satAmt > 0 || jitterAmt > 0){
-      const sharedNoise = jitterAmt > 0 ? generateSmoothNoise(channels[0].length, fs, 5) : null;
-      channels = channels.map(ch => vocalSaturateJitter(ch, fs, satAmt, jitterAmt, sharedNoise));
-      log('[03] 보컬 새츄레이션/지터 적용 (새츄레이션 '+Math.round(satAmt*100)+'% · 지터 '+Math.round(jitterAmt*100)+'%) — 250Hz~4kHz 중역대에만 적용');
+      let stemsOk = false;
+      if(useStemSep){
+        try{
+          setProgress(65, '🧬 AI 스템 분리 준비 중...');
+          const sep = await separateStemsFull(channels, fs, (frac, label)=>{
+            setProgress(65 + frac*20, label || '🧬 AI 스템 분리 중...');
+          });
+          const sharedNoise = jitterAmt > 0 ? generateSmoothNoise(channels[0].length, fs, 5) : null;
+          const vocalsProcessed = sep.vocals.map(ch => {
+            let out = ch;
+            if(satAmt>0){
+              const o = new Float32Array(out.length);
+              for(let i=0;i<o.length;i++) o[i] = saturateSample(out[i], satAmt);
+              out = o;
+            }
+            if(jitterAmt>0) out = applyJitter(out, fs, jitterAmt, sharedNoise);
+            return out;
+          });
+          channels = channels.map((ch,c)=>{
+            const inst = sep.instrumental[c] || sep.instrumental[0];
+            const voc = vocalsProcessed[c] || vocalsProcessed[0];
+            const out = new Float32Array(ch.length);
+            for(let i=0;i<out.length;i++) out[i] = inst[i] + voc[i];
+            return out;
+          });
+          log('[03] 🧬 실제 AI 스템 분리 적용 (신경망으로 보컬/반주 완전 분리 후 개별 처리) — 새츄레이션 '+Math.round(satAmt*100)+'% · 지터 '+Math.round(jitterAmt*100)+'%');
+          stemsOk = true;
+        } catch(err){
+          log('[03] ⚠ AI 스템 분리 실패 ('+err.message+') — 대역 제한 근사 방식으로 자동 전환', 'warn');
+        }
+      }
+      if(!stemsOk){
+        const sharedNoise = jitterAmt > 0 ? generateSmoothNoise(channels[0].length, fs, 5) : null;
+        channels = channels.map(ch => vocalSaturateJitter(ch, fs, satAmt, jitterAmt, sharedNoise));
+        log('[03] 보컬 새츄레이션/지터 적용 (새츄레이션 '+Math.round(satAmt*100)+'% · 지터 '+Math.round(jitterAmt*100)+'%) — 250Hz~4kHz 중역대에만 적용');
+      }
     }
-    setProgress(65, 'EQ / 스테레오 폭 처리 중...');
+    setProgress(85, 'EQ / 스테레오 폭 처리 중...');
 
     // 2) Tone EQ (5 band)
     const eqGains = Array.from(document.querySelectorAll('.eqSlider')).map(s=>parseFloat(s.value));
