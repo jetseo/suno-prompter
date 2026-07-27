@@ -174,7 +174,11 @@
   }
 
   /* ---------- Waveform / spectrum ---------- */
-  #waveCanvas{ width:100%; height:80px; display:block; border-radius:6px; background:#101215; }
+  #waveCanvas{ width:100%; height:120px; display:block; border-radius:6px; background:#101215; }
+  .waveLegend{ display:flex; gap:16px; margin-top:8px; flex-wrap:wrap; }
+  .legendItem{ display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-dim); font-family:var(--mono); }
+  .legendItem .swatch{ width:11px; height:11px; border-radius:3px; display:inline-block; }
+  #btnWaveMode.active{ background:var(--red); color:#fff; border-color:var(--red); }
   #specCanvas{ width:100%; height:64px; display:block; border-radius:6px; background:#101215; margin-top:8px; }
   .specLabel{ font-size:10.5px; color:var(--text-dim); margin-top:6px; font-family:var(--mono); }
 
@@ -365,14 +369,16 @@
   <!-- 6. 비교 & 저장 -->
   <div class="module">
     <h2><span class="num">06</span>파형 비교 &amp; 저장</h2>
-    <canvas id="waveCanvas" width="900" height="80"></canvas>
+    <canvas id="waveCanvas" width="900" height="120"></canvas>
+    <div class="waveLegend" id="waveLegend"></div>
     <canvas id="specCanvas" width="900" height="64"></canvas>
     <div class="specLabel">실시간 스펙트럼 · 재생 중에만 표시됩니다</div>
     <div class="transport" style="margin-top:14px;">
       <div class="abToggle">
-        <button id="btnA" class="active">A · 원본</button>
-        <button id="btnB">B · 마스터링</button>
+        <button id="btnA" class="active">A · 원본 재생</button>
+        <button id="btnB">B · 마스터링 재생</button>
       </div>
+      <button id="btnWaveMode" class="ghost">🔍 차이만 보기</button>
       <button id="btnProcess" class="primary" disabled>마스터링 처리 실행</button>
       <button id="btnPlay" disabled>▶ 재생</button>
       <button id="btnStop" disabled>■ 정지</button>
@@ -401,6 +407,7 @@
     playMode: 'A', // 'A' original, 'B' processed
     sourceNode: null,
     isPlaying: false,
+    waveMode: 'overlay', // 'overlay' or 'diff'
   };
 
   const $ = (id) => document.getElementById(id);
@@ -687,36 +694,102 @@
   }
   drawVU(null);
 
-  // ================= Waveform drawing =================
+  // ================= Waveform drawing: overlay + diff comparison =================
   const waveCanvas = $('waveCanvas');
   const waveCtx = waveCanvas.getContext('2d');
-  function drawWaveform(channelData, color){
-    const w = waveCanvas.width, h = waveCanvas.height;
-    waveCtx.clearRect(0,0,w,h);
-    waveCtx.fillStyle = '#101215';
-    waveCtx.fillRect(0,0,w,h);
-    if(!channelData) return;
-    const mid = h/2;
-    const step = Math.ceil(channelData.length / w);
-    waveCtx.beginPath();
-    waveCtx.strokeStyle = color;
-    waveCtx.lineWidth = 1;
+  let lastDiffScale = 1; // auto-computed each diff draw, shown in the legend
+
+  function computeColumns(data, w){
+    const cols = new Array(w);
+    const step = Math.max(1, Math.ceil(data.length / w));
     for(let x=0; x<w; x++){
       let min=1, max=-1;
       const start = x*step;
       for(let i=0;i<step;i++){
         const idx = start+i;
-        if(idx>=channelData.length) break;
-        const v = channelData[idx];
+        if(idx>=data.length) break;
+        const v = data[idx];
         if(v<min) min=v;
         if(v>max) max=v;
       }
-      waveCtx.moveTo(x, mid + min*mid*0.9);
-      waveCtx.lineTo(x, mid + max*mid*0.9);
+      if(min>max){ min=0; max=0; }
+      cols[x] = {min,max};
     }
-    waveCtx.stroke();
+    return cols;
   }
-  drawWaveform(null,'#5fd3c4');
+
+  function drawEnvelope(cols, w, h, mid, fillColor){
+    waveCtx.beginPath();
+    for(let x=0;x<w;x++){
+      const y = mid + cols[x].max*mid*0.9;
+      if(x===0) waveCtx.moveTo(x,y); else waveCtx.lineTo(x,y);
+    }
+    for(let x=w-1;x>=0;x--) waveCtx.lineTo(x, mid + cols[x].min*mid*0.9);
+    waveCtx.closePath();
+    waveCtx.fillStyle = fillColor;
+    waveCtx.fill();
+  }
+
+  // Draws original (gray) and processed (amber) waveforms overlaid on the
+  // same axis so the ear-level difference between them is visible at a
+  // glance, or — in diff mode — the sample-wise delta amplified for clarity.
+  function drawWaveformCompare(origData, procData, mode){
+    const w = waveCanvas.width, h = waveCanvas.height;
+    waveCtx.clearRect(0,0,w,h);
+    waveCtx.fillStyle = '#101215';
+    waveCtx.fillRect(0,0,w,h);
+    const mid = h/2;
+
+    if(mode==='diff' && origData && procData){
+      const len = Math.min(origData.length, procData.length);
+      const raw = new Float32Array(len);
+      let maxAbs = 0;
+      for(let i=0;i<len;i++){
+        const d = procData[i]-origData[i];
+        raw[i] = d;
+        const a = Math.abs(d);
+        if(a>maxAbs) maxAbs = a;
+      }
+      // auto-scale so the biggest difference fills ~90% of the canvas —
+      // a fixed multiplier would clip solid whenever there's a large
+      // overall gain change (the most common "difference" of all).
+      lastDiffScale = maxAbs>1e-6 ? Math.min(50, 0.9/maxAbs) : 1;
+      const diff = new Float32Array(len);
+      for(let i=0;i<len;i++) diff[i] = raw[i]*lastDiffScale;
+      drawEnvelope(computeColumns(diff, w), w, h, mid, 'rgba(229,72,77,0.8)');
+      return;
+    }
+    if(origData) drawEnvelope(computeColumns(origData, w), w, h, mid, 'rgba(107,114,128,0.55)');
+    if(procData) drawEnvelope(computeColumns(procData, w), w, h, mid, 'rgba(232,163,61,0.65)');
+  }
+
+  function updateWaveLegend(){
+    const el = $('waveLegend');
+    if(state.waveMode==='diff'){
+      el.innerHTML = '<span class="legendItem"><span class="swatch" style="background:rgba(229,72,77,0.9)"></span>차이 파형 (원본 대비, 약 '+lastDiffScale.toFixed(1)+'배 확대해 표시)</span>';
+    } else {
+      el.innerHTML =
+        '<span class="legendItem"><span class="swatch" style="background:rgba(107,114,128,0.9)"></span>원본 (A)</span>'+
+        '<span class="legendItem"><span class="swatch" style="background:rgba(232,163,61,0.9)"></span>마스터링 (B)</span>';
+    }
+  }
+
+  function refreshWaveform(){
+    const origData = state.originalBuffer ? state.originalBuffer.getChannelData(0) : null;
+    const procData = state.processedChannels ? state.processedChannels[0] : null;
+    drawWaveformCompare(origData, procData, state.waveMode);
+    updateWaveLegend();
+  }
+
+  $('btnWaveMode').addEventListener('click', ()=>{
+    if(!state.processedChannels){ log('먼저 마스터링을 처리해야 차이를 비교할 수 있어요.', 'warn'); return; }
+    state.waveMode = state.waveMode==='diff' ? 'overlay' : 'diff';
+    $('btnWaveMode').textContent = state.waveMode==='diff' ? '↔ 겹쳐보기로 전환' : '🔍 차이만 보기';
+    $('btnWaveMode').classList.toggle('active', state.waveMode==='diff');
+    refreshWaveform();
+  });
+
+  refreshWaveform();
 
   // ================= Presets (Character) =================
   // band order: [Sub 60Hz, Bass 150Hz, L-Mid 400Hz, Mid 1kHz, H-Mid 2.5kHz, Pres 6kHz, Air 12kHz]
@@ -872,6 +945,9 @@
     log('파일 로딩: '+file.name);
     $('eqHint').style.display = 'none';
     $('btnNewSong').style.display = 'none';
+    state.waveMode = 'overlay';
+    $('btnWaveMode').textContent = '🔍 차이만 보기';
+    $('btnWaveMode').classList.remove('active');
     const meta = $('fileMeta');
     meta.style.display='block';
     meta.textContent = file.name+' · '+(file.size/1024/1024).toFixed(2)+' MB';
@@ -896,7 +972,7 @@
         $('peakVal').textContent = peak.toFixed(1)+' dBTP';
         $('peakVal').className = 'value '+(peak > -1 ? 'hot' : 'dim');
         drawVU(lufs);
-        drawWaveform(chans[0], '#4b5563');
+        refreshWaveform();
         log('원본 러프니스: '+lufs.toFixed(1)+' LUFS, 트루피크 '+peak.toFixed(1)+' dBTP', 'ok');
         $('btnProcess').disabled = false;
         $('btnPlay').disabled = false;
@@ -1268,7 +1344,7 @@
     state.procLufsVal = finalLufs;
     updateLufsDisplay('proc', finalLufs);
     drawVU(finalLufs);
-    drawWaveform(channels[0], '#e8a33d');
+    refreshWaveform();
     log('마스터링 완료 · 최종 '+finalLufs.toFixed(1)+' LUFS, 트루피크 '+truePeakDb.toFixed(1)+' dBTP', 'ok');
 
     $('btnExport').disabled = false;
@@ -1427,13 +1503,11 @@
   $('btnA').addEventListener('click', ()=>{
     state.playMode='A';
     $('btnA').classList.add('active'); $('btnB').classList.remove('active');
-    if(state.originalBuffer) drawWaveform(state.originalBuffer.getChannelData(0), '#4b5563');
   });
   $('btnB').addEventListener('click', ()=>{
     if(!state.processedChannels) return;
     state.playMode='B';
     $('btnB').classList.add('active'); $('btnA').classList.remove('active');
-    drawWaveform(state.processedChannels[0], '#e8a33d');
   });
 
   // ================= WAV export =================
