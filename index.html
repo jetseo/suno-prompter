@@ -307,9 +307,32 @@
     </div>
   </div>
 
-  <!-- 3. Character 프리셋 & EQ -->
+  <!-- 3. 보컬 새츄레이션 & 지터 -->
   <div class="module">
-    <h2><span class="num">03</span>음색 성향(Character) &amp; 7밴드 EQ</h2>
+    <h2><span class="num">03</span>보컬 새츄레이션 &amp; 지터 (AI 티 줄이기)</h2>
+    <div class="row">
+      <label>새츄레이션<span class="sub">아날로그 테이프/진공관 질감의 배음 추가</span></label>
+      <input type="range" id="satAmt" min="0" max="100" value="0">
+      <div class="rowVal" id="satAmtVal">0%</div>
+    </div>
+    <div class="row">
+      <label>피치/타이밍 지터<span class="sub">미세한 흔들림으로 기계적인 정확함 완화</span></label>
+      <input type="range" id="jitterAmt" min="0" max="100" value="0">
+      <div class="rowVal" id="jitterAmtVal">0%</div>
+    </div>
+    <div class="smartHint" style="display:block; margin-top:12px;">✦ 완전한 보컬 분리가 아닌, 보컬이 주로 위치하는 중역대(250Hz~4kHz)에만 적용됩니다. 베이스·킥·심벌 등은 거의 영향받지 않습니다.</div>
+    <div class="row" style="margin-top:14px;">
+      <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+        <input type="checkbox" id="stemSeparate" style="width:auto;">
+        <span>🧬 실제 AI 스템 분리 사용 (베타)</span>
+      </label>
+    </div>
+    <div class="smartHint" style="display:block; margin-top:8px;">✦ 브라우저에서 직접 신경망 모델(약 57MB, 최초 1회만 다운로드 후 캐시됨)을 실행해 보컬/반주를 실제로 분리한 뒤 각각 처리합니다. 서버 업로드는 없지만 곡 길이에 따라 수 분~수십 분이 걸릴 수 있고, 실패 시 위의 대역 제한 근사 방식으로 자동 전환됩니다.</div>
+  </div>
+
+  <!-- 4. Character 프리셋 & EQ -->
+  <div class="module">
+    <h2><span class="num">04</span>음색 성향(Character) &amp; 7밴드 EQ</h2>
     <button id="btnSmartEq" class="ghost" disabled style="width:100%; margin-bottom:12px;">🧠 스마트 EQ 추천 — 곡 스펙트럼 분석 후 밴드 자동 보정</button>
     <div class="smartHint" id="eqHint" style="display:none;"></div>
     <select id="presetSelect">
@@ -341,9 +364,9 @@
     </div>
   </div>
 
-  <!-- 4. 스테레오 폭 -->
+  <!-- 5. 스테레오 폭 -->
   <div class="module">
-    <h2><span class="num">04</span>스테레오 폭 조절</h2>
+    <h2><span class="num">05</span>스테레오 폭 조절</h2>
     <div class="row">
       <label>스테레오 폭<span class="sub">100% = 원본 · 0% = 모노</span></label>
       <input type="range" id="widthAmt" min="0" max="200" value="100">
@@ -351,9 +374,9 @@
     </div>
   </div>
 
-  <!-- 5. 최종 음압 보정 -->
+  <!-- 6. 최종 음압 보정 -->
   <div class="module">
-    <h2><span class="num">05</span>최종 음압(LUFS) 보정</h2>
+    <h2><span class="num">06</span>최종 음압(LUFS) 보정</h2>
     <div class="row">
       <label>목표 러프니스<span class="sub">음원 사이트 권장 -14 ~ -10 LUFS</span></label>
       <input type="range" id="targetLufs" min="-20" max="-6" value="-14">
@@ -366,9 +389,9 @@
     </div>
   </div>
 
-  <!-- 6. 비교 & 저장 -->
+  <!-- 7. 비교 & 저장 -->
   <div class="module">
-    <h2><span class="num">06</span>파형 비교 &amp; 저장</h2>
+    <h2><span class="num">07</span>파형 비교 &amp; 저장</h2>
     <canvas id="waveCanvas" width="900" height="120"></canvas>
     <div class="waveLegend" id="waveLegend"></div>
     <canvas id="specCanvas" width="900" height="64"></canvas>
@@ -730,9 +753,30 @@
     waveCtx.fill();
   }
 
-  // Draws original (gray) and processed (amber) waveforms overlaid on the
-  // same axis so the ear-level difference between them is visible at a
-  // glance, or — in diff mode — the sample-wise delta amplified for clarity.
+  // Traces the min/max envelope as a stroked outline (not filled) — used to
+  // draw the original waveform ON TOP of the mastered fill so any point
+  // where they diverge sticks out as a visible line poking above/below the
+  // fill, instead of two translucent fills blending into one blob.
+  function drawOutline(cols, w, h, mid, strokeColor, lineWidth){
+    waveCtx.strokeStyle = strokeColor;
+    waveCtx.lineWidth = lineWidth;
+    waveCtx.beginPath();
+    for(let x=0;x<w;x++){
+      const y = mid + cols[x].max*mid*0.9;
+      if(x===0) waveCtx.moveTo(x,y); else waveCtx.lineTo(x,y);
+    }
+    waveCtx.stroke();
+    waveCtx.beginPath();
+    for(let x=0;x<w;x++){
+      const y = mid + cols[x].min*mid*0.9;
+      if(x===0) waveCtx.moveTo(x,y); else waveCtx.lineTo(x,y);
+    }
+    waveCtx.stroke();
+  }
+
+  // Draws original vs. processed waveforms on the same axis so the actual
+  // difference is visible at a glance, or — in diff mode — the sample-wise
+  // delta amplified for clarity.
   function drawWaveformCompare(origData, procData, mode){
     const w = waveCanvas.width, h = waveCanvas.height;
     waveCtx.clearRect(0,0,w,h);
@@ -759,18 +803,31 @@
       drawEnvelope(computeColumns(diff, w), w, h, mid, 'rgba(229,72,77,0.8)');
       return;
     }
-    if(origData) drawEnvelope(computeColumns(origData, w), w, h, mid, 'rgba(107,114,128,0.55)');
-    if(procData) drawEnvelope(computeColumns(procData, w), w, h, mid, 'rgba(232,163,61,0.65)');
+
+    if(origData && procData){
+      // fill = mastered (base), outline = original (traced on top) — a
+      // filled-vs-filled overlay blends into one color at a glance, but a
+      // stroked line always stands out against the fill wherever it pokes
+      // outside or dips inside it.
+      drawEnvelope(computeColumns(procData, w), w, h, mid, 'rgba(232,163,61,0.55)');
+      drawOutline(computeColumns(origData, w), w, h, mid, 'rgba(226,232,240,0.9)', 1.25);
+    } else if(procData){
+      drawEnvelope(computeColumns(procData, w), w, h, mid, 'rgba(232,163,61,0.65)');
+    } else if(origData){
+      drawEnvelope(computeColumns(origData, w), w, h, mid, 'rgba(107,114,128,0.55)');
+    }
   }
 
   function updateWaveLegend(){
     const el = $('waveLegend');
     if(state.waveMode==='diff'){
       el.innerHTML = '<span class="legendItem"><span class="swatch" style="background:rgba(229,72,77,0.9)"></span>차이 파형 (원본 대비, 약 '+lastDiffScale.toFixed(1)+'배 확대해 표시)</span>';
-    } else {
+    } else if(state.processedChannels){
       el.innerHTML =
-        '<span class="legendItem"><span class="swatch" style="background:rgba(107,114,128,0.9)"></span>원본 (A)</span>'+
-        '<span class="legendItem"><span class="swatch" style="background:rgba(232,163,61,0.9)"></span>마스터링 (B)</span>';
+        '<span class="legendItem"><span class="swatch" style="background:rgba(226,232,240,0.9);border:1px solid rgba(226,232,240,0.9);"></span>원본 (윤곽선)</span>'+
+        '<span class="legendItem"><span class="swatch" style="background:rgba(232,163,61,0.9)"></span>마스터링 (채우기)</span>';
+    } else {
+      el.innerHTML = '<span class="legendItem"><span class="swatch" style="background:rgba(107,114,128,0.9)"></span>원본</span>';
     }
   }
 
@@ -794,12 +851,12 @@
   // ================= Presets (Character) =================
   // band order: [Sub 60Hz, Bass 150Hz, L-Mid 400Hz, Mid 1kHz, H-Mid 2.5kHz, Pres 6kHz, Air 12kHz]
   const PRESETS = {
-    standard: {eq:[0,0,0,0,0,0,0],      noise:20, ai:25, width:100},
-    clean:    {eq:[0,-1,-2,-1,2,2,1],   noise:45, ai:55, width:100},
-    punchy:   {eq:[4,3,-1,0,1,1,0],     noise:25, ai:30, width:95},
-    warm:     {eq:[2,3,2,0,-1,-2,-3],   noise:35, ai:40, width:90},
-    airy:     {eq:[-1,-1,-1,0,2,3,5],   noise:30, ai:45, width:130},
-    vshape:   {eq:[3,2,-2,-3,0,2,4],    noise:30, ai:35, width:115},
+    standard: {eq:[0,0,0,0,0,0,0],      noise:20, ai:25, width:100, sat:0,  jitter:0},
+    clean:    {eq:[0,-1,-2,-1,2,2,1],   noise:45, ai:55, width:100, sat:0,  jitter:0},
+    punchy:   {eq:[4,3,-1,0,1,1,0],     noise:25, ai:30, width:95,  sat:15, jitter:5},
+    warm:     {eq:[2,3,2,0,-1,-2,-3],   noise:35, ai:40, width:90,  sat:25, jitter:10},
+    airy:     {eq:[-1,-1,-1,0,2,3,5],   noise:30, ai:45, width:130, sat:10, jitter:15},
+    vshape:   {eq:[3,2,-2,-3,0,2,4],    noise:30, ai:35, width:115, sat:15, jitter:5},
   };
 
   function applyPreset(name){
@@ -816,6 +873,10 @@
     $('aiDenoiseAmtVal').textContent = p.ai+'%';
     $('widthAmt').value = p.width;
     $('widthAmtVal').textContent = p.width+'%';
+    $('satAmt').value = p.sat;
+    $('satAmtVal').textContent = p.sat+'%';
+    $('jitterAmt').value = p.jitter;
+    $('jitterAmtVal').textContent = p.jitter+'%';
   }
 
   $('presetSelect').addEventListener('change', (e)=> applyPreset(e.target.value));
@@ -853,6 +914,14 @@
     $('widthAmtVal').textContent = e.target.value+'%';
     $('presetSelect').value = 'custom';
   });
+  $('satAmt').addEventListener('input', (e)=>{
+    $('satAmtVal').textContent = e.target.value+'%';
+    $('presetSelect').value = 'custom';
+  });
+  $('jitterAmt').addEventListener('input', (e)=>{
+    $('jitterAmtVal').textContent = e.target.value+'%';
+    $('presetSelect').value = 'custom';
+  });
   $('targetLufs').addEventListener('input', (e)=>{
     $('targetLufsVal').textContent = e.target.value+' LUFS';
   });
@@ -875,6 +944,8 @@
       noise: parseFloat($('noiseAmt').value),
       ai: parseFloat($('aiDenoiseAmt').value),
       width: parseFloat($('widthAmt').value),
+      sat: parseFloat($('satAmt').value),
+      jitter: parseFloat($('jitterAmt').value),
       targetLufs: parseFloat($('targetLufs').value),
       ceiling: parseFloat($('ceiling').value),
     };
@@ -887,6 +958,8 @@
     $('noiseAmt').value = p.noise; $('noiseAmtVal').textContent = p.noise+'%';
     $('aiDenoiseAmt').value = p.ai; $('aiDenoiseAmtVal').textContent = p.ai+'%';
     $('widthAmt').value = p.width; $('widthAmtVal').textContent = p.width+'%';
+    $('satAmt').value = p.sat||0; $('satAmtVal').textContent = (p.sat||0)+'%';
+    $('jitterAmt').value = p.jitter||0; $('jitterAmtVal').textContent = (p.jitter||0)+'%';
     $('targetLufs').value = p.targetLufs; $('targetLufsVal').textContent = p.targetLufs+' LUFS';
     $('ceiling').value = p.ceiling; $('ceilingVal').textContent = parseFloat(p.ceiling).toFixed(1)+' dB';
     $('presetSelect').value = 'custom';
@@ -1055,6 +1128,289 @@
     return w;
   }
 
+  // ================= Bluestein FFT (arbitrary length) =================
+  // The stem-separation model needs n_fft=5120, which isn't a power of 2,
+  // so the radix-2 fftInPlace above can't be used directly. Bluestein's
+  // algorithm reduces an arbitrary-length N-point DFT to a convolution,
+  // computed via the existing power-of-2 fftInPlace as the core primitive.
+  // Verified against numpy.fft.fft to ~1e-13 absolute error, and the full
+  // STFT/model/ISTFT round-trip verified against a PyTorch reference to
+  // correlation 0.9999999999999943 (see models/README.md).
+  function nextPow2(n){ let p=1; while(p<n) p*=2; return p; }
+  const bluesteinCache = {};
+  function getBluesteinPlan(N){
+    if(bluesteinCache[N]) return bluesteinCache[N];
+    const M = nextPow2(2*N-1);
+    const wRe = new Float64Array(N), wIm = new Float64Array(N);
+    for(let n=0;n<N;n++){
+      const nn = (n*n) % (2*N);
+      const ang = -Math.PI*nn/N;
+      wRe[n]=Math.cos(ang); wIm[n]=Math.sin(ang);
+    }
+    const bRe = new Float64Array(M), bIm = new Float64Array(M);
+    bRe[0]=wRe[0]; bIm[0]=-wIm[0];
+    for(let n=1;n<N;n++){
+      bRe[n]=wRe[n]; bIm[n]=-wIm[n];
+      bRe[M-n]=wRe[n]; bIm[M-n]=-wIm[n];
+    }
+    fftInPlace(bRe, bIm, false);
+    const plan = {N, M, wRe, wIm, Bre:bRe, Bim:bIm};
+    bluesteinCache[N] = plan;
+    return plan;
+  }
+  // in-place-ish: xRe/xIm (length N) -> returns [outRe, outIm] (length N)
+  function bluesteinTransform(plan, xRe, xIm, inverse){
+    const {N,M,wRe,wIm,Bre,Bim} = plan;
+    const aRe = new Float64Array(M), aIm = new Float64Array(M);
+    const sign = inverse ? 1 : -1;
+    for(let n=0;n<N;n++){
+      const wr = wRe[n], wi = sign>0 ? -wIm[n] : wIm[n];
+      aRe[n] = xRe[n]*wr - xIm[n]*wi;
+      aIm[n] = xRe[n]*wi + xIm[n]*wr;
+    }
+    fftInPlace(aRe, aIm, false);
+    const cRe = new Float64Array(M), cIm = new Float64Array(M);
+    for(let i=0;i<M;i++){
+      const br = Bre[i], bi = inverse ? -Bim[i] : Bim[i];
+      cRe[i] = aRe[i]*br - aIm[i]*bi;
+      cIm[i] = aRe[i]*bi + aIm[i]*br;
+    }
+    fftInPlace(cRe, cIm, true);
+    const outRe = new Float64Array(N), outIm = new Float64Array(N);
+    for(let k=0;k<N;k++){
+      const wr = wRe[k], wi = inverse ? -wIm[k] : wIm[k];
+      outRe[k] = cRe[k]*wr - cIm[k]*wi;
+      outIm[k] = cRe[k]*wi + cIm[k]*wr;
+    }
+    if(inverse){ for(let k=0;k<N;k++){ outRe[k]/=N; outIm[k]/=N; } }
+    return [outRe, outIm];
+  }
+
+  // ================= MDX-Net STFT/ISTFT (matches torch.stft/istft exactly) =================
+  // Config fixed by the vendored model's I/O contract — see models/README.md.
+  const MDX_N_FFT = 5120, MDX_HOP = 1024, MDX_DIM_F = 2560, MDX_DIM_T = 256, MDX_COMPENSATE = 1.01;
+  const MDX_OVERLAP = 0.25, MDX_SR = 44100;
+  const MDX_N_BINS = MDX_N_FFT/2 + 1;
+  let mdxWindowCache = null;
+  function mdxHannWindow(){
+    if(mdxWindowCache) return mdxWindowCache;
+    const w = new Float32Array(MDX_N_FFT);
+    for(let i=0;i<MDX_N_FFT;i++) w[i] = 0.5 - 0.5*Math.cos(2*Math.PI*i/MDX_N_FFT); // periodic, matches torch.hann_window(periodic=True)
+    mdxWindowCache = w;
+    return w;
+  }
+  // reflect-pad matching numpy/torch's default reflect mode (edge sample not repeated)
+  function reflectPad(x, padLeft, padRight){
+    const n = x.length;
+    const out = new Float32Array(n + padLeft + padRight);
+    for(let i=0;i<padLeft;i++) out[i] = x[padLeft - i];
+    out.set(x, padLeft);
+    for(let i=0;i<padRight;i++) out[padLeft + n + i] = x[n - 2 - i];
+    return out;
+  }
+  // STFT of one channel -> {re,im}: arrays of MDX_DIM_F Float32Arrays (each length numFrames), cropped/zeroed per model contract
+  function mdxStftChannel(x){
+    const plan = getBluesteinPlan(MDX_N_FFT);
+    const window = mdxHannWindow();
+    const padded = reflectPad(x, MDX_N_FFT/2, MDX_N_FFT/2);
+    const numFrames = 1 + Math.floor((padded.length - MDX_N_FFT) / MDX_HOP);
+    const re = new Array(MDX_DIM_F), im = new Array(MDX_DIM_F);
+    for(let f=0; f<MDX_DIM_F; f++){ re[f] = new Float32Array(numFrames); im[f] = new Float32Array(numFrames); }
+    const frameRe = new Float64Array(MDX_N_FFT), frameIm = new Float64Array(MDX_N_FFT);
+    for(let t=0; t<numFrames; t++){
+      const start = t*MDX_HOP;
+      for(let i=0;i<MDX_N_FFT;i++){ frameRe[i] = padded[start+i]*window[i]; frameIm[i] = 0; }
+      const [Xre, Xim] = bluesteinTransform(plan, frameRe, frameIm, false);
+      for(let f=0; f<MDX_DIM_F; f++){
+        // model contract zeroes the first 3 bins (reduces low-frequency noise)
+        re[f][t] = f<3 ? 0 : Xre[f];
+        im[f][t] = f<3 ? 0 : Xim[f];
+      }
+    }
+    return { re, im, numFrames };
+  }
+  // Inverse STFT: re,im are MDX_DIM_F x numFrames -> real waveform, length (numFrames-1)*hop+n_fft, UNTRIMMED
+  function mdxIstftChannelRaw(re, im, numFrames){
+    const plan = getBluesteinPlan(MDX_N_FFT);
+    const window = mdxHannWindow();
+    const outLen = (numFrames-1)*MDX_HOP + MDX_N_FFT;
+    const overlapBuf = new Float64Array(outLen);
+    const windowSumSq = new Float64Array(outLen);
+    const frameRe = new Float64Array(MDX_N_FFT), frameIm = new Float64Array(MDX_N_FFT);
+    for(let t=0; t<numFrames; t++){
+      frameRe.fill(0); frameIm.fill(0);
+      for(let f=0; f<MDX_N_BINS; f++){
+        const rv = f<MDX_DIM_F ? re[f][t] : 0;
+        const iv = f<MDX_DIM_F ? im[f][t] : 0;
+        frameRe[f]=rv; frameIm[f]=iv;
+        if(f>0 && f<MDX_N_FFT-f){ const mirror = MDX_N_FFT-f; frameRe[mirror]=rv; frameIm[mirror]=-iv; }
+      }
+      const [xre] = bluesteinTransform(plan, frameRe, frameIm, true);
+      const start = t*MDX_HOP;
+      for(let i=0;i<MDX_N_FFT;i++){
+        const wv = window[i];
+        overlapBuf[start+i] += xre[i]*wv;
+        windowSumSq[start+i] += wv*wv;
+      }
+    }
+    const out = new Float32Array(outLen);
+    for(let i=0;i<outLen;i++) out[i] = windowSumSq[i]>1e-11 ? overlapBuf[i]/windowSumSq[i] : 0;
+    return out;
+  }
+  function mdxIstftChannel(re, im, numFrames){
+    const raw = mdxIstftChannelRaw(re, im, numFrames);
+    const trim = MDX_N_FFT/2;
+    return raw.slice(trim, raw.length-trim); // torch.istft(center=True) trims n_fft/2 off each side
+  }
+
+  // ================= AI stem separation (ONNX Runtime Web, same-origin vendored, no third-party CDN) =================
+  let mdxSessionPromise = null;
+  async function ensureOrtLoaded(){
+    if(window.ort) return;
+    await new Promise((resolve, reject)=>{
+      const s = document.createElement('script');
+      s.src = 'vendor/ort/ort.wasm.min.js';
+      s.onload = resolve;
+      s.onerror = ()=>reject(new Error('ONNX Runtime 로드 실패'));
+      document.head.appendChild(s);
+    });
+    if(!window.ort) throw new Error('ONNX Runtime 로드 실패');
+    ort.env.wasm.numThreads = 1;
+  }
+  function ensureMdxSession(onStatus){
+    if(!mdxSessionPromise){
+      mdxSessionPromise = (async ()=>{
+        if(onStatus) onStatus('AI 모델 런타임 불러오는 중...');
+        await ensureOrtLoaded();
+        if(onStatus) onStatus('스템 분리 모델(약 57MB) 다운로드 중... (최초 1회만)');
+        return await ort.InferenceSession.create('models/UVR-MDX-NET-Inst_HQ_5.onnx', { executionProviders: ['wasm'] });
+      })().catch(err=>{ mdxSessionPromise = null; throw err; }); // allow retry on next call after a failure
+    }
+    return mdxSessionPromise;
+  }
+
+  // Resamples via the browser's native (high-quality) OfflineAudioContext resampler —
+  // the MDX model was trained at a fixed 44.1kHz and requires matching input.
+  async function resampleTo(channels, fromRate, toRate){
+    if(fromRate === toRate) return channels;
+    const len = channels[0].length;
+    const outLen = Math.max(1, Math.ceil(len * toRate / fromRate));
+    const offlineCtx = new OfflineAudioContext(channels.length, outLen, toRate);
+    const srcBuf = offlineCtx.createBuffer(channels.length, len, fromRate);
+    channels.forEach((ch,i)=> srcBuf.copyToChannel(ch, i));
+    const src = offlineCtx.createBufferSource();
+    src.buffer = srcBuf;
+    src.connect(offlineCtx.destination);
+    src.start();
+    const rendered = await offlineCtx.startRendering();
+    const out = [];
+    for(let c=0;c<channels.length;c++) out.push(rendered.getChannelData(c).slice());
+    return out;
+  }
+
+  // Runs one fixed-size (chunkSize-sample) stereo chunk through STFT -> ONNX model -> ISTFT.
+  async function runMdxChunk(session, Lchunk, Rchunk){
+    const stftL = mdxStftChannel(Lchunk);
+    const stftR = mdxStftChannel(Rchunk);
+    const total = 4*MDX_DIM_F*MDX_DIM_T;
+    const inputData = new Float32Array(total);
+    function writeCh(chIdx, arr2d){
+      for(let f=0; f<MDX_DIM_F; f++){
+        const row = arr2d[f];
+        const base = chIdx*MDX_DIM_F*MDX_DIM_T + f*MDX_DIM_T;
+        for(let t=0; t<MDX_DIM_T; t++) inputData[base+t] = row[t];
+      }
+    }
+    writeCh(0, stftL.re); writeCh(1, stftL.im); writeCh(2, stftR.re); writeCh(3, stftR.im);
+    const inputTensor = new ort.Tensor('float32', inputData, [1,4,MDX_DIM_F,MDX_DIM_T]);
+    const results = await session.run({ input: inputTensor });
+    const outData = results[session.outputNames[0]].data;
+    function extractOutCh(chIdx){
+      const arr2d = new Array(MDX_DIM_F);
+      const base = chIdx*MDX_DIM_F*MDX_DIM_T;
+      for(let f=0; f<MDX_DIM_F; f++){
+        const row = new Float32Array(MDX_DIM_T);
+        const rowBase = base + f*MDX_DIM_T;
+        for(let t=0; t<MDX_DIM_T; t++) row[t] = outData[rowBase+t];
+        arr2d[f] = row;
+      }
+      return arr2d;
+    }
+    const outL = mdxIstftChannel(extractOutCh(0), extractOutCh(1), MDX_DIM_T);
+    const outR = mdxIstftChannel(extractOutCh(2), extractOutCh(3), MDX_DIM_T);
+    return { L: outL, R: outR };
+  }
+
+  // Full-track chunked overlap-add separation, matching audio-separator's MDXSeparator.demix()
+  // exactly (25% overlap, Hann crossfade windowing, divider-array normalization). Returns the
+  // instrumental stem directly from the model, and derives vocals via mix - instrumental*compensate
+  // (the reference's default invert_using_spec=False path) rather than a second model pass.
+  async function separateStemsFull(channels, fs, onProgress){
+    const Lin = channels[0], Rin = channels.length>1 ? channels[1] : channels[0];
+    const resampled = await resampleTo([Lin, Rin], fs, MDX_SR);
+    const L = resampled[0], R = resampled[1];
+    const origLen = L.length;
+
+    const trim = MDX_N_FFT/2; // 2560
+    const chunkSize = MDX_HOP*(MDX_DIM_T-1); // 261120
+    const genSize = chunkSize - 2*trim; // 256000
+    const pad = genSize + trim - (origLen % genSize);
+    const mixLen = trim + origLen + pad;
+
+    const mixL = new Float32Array(mixLen), mixR = new Float32Array(mixLen);
+    mixL.set(L, trim); mixR.set(R, trim);
+
+    const step = Math.round((1-MDX_OVERLAP)*chunkSize); // 195840
+    const resultL = new Float32Array(mixLen), resultR = new Float32Array(mixLen);
+    const divider = new Float32Array(mixLen);
+    const totalChunks = Math.ceil(mixLen/step);
+
+    const session = await ensureMdxSession(msg => onProgress && onProgress(0, msg));
+
+    let chunkIdx = 0;
+    for(let i=0; i<mixLen; i+=step){
+      chunkIdx++;
+      const start = i, end = Math.min(i+chunkSize, mixLen);
+      const chunkActual = end-start;
+      const window = getHann(chunkActual);
+
+      let Lc = mixL.subarray(start, end), Rc = mixR.subarray(start, end);
+      if(chunkActual < chunkSize){
+        const Lp = new Float32Array(chunkSize), Rp = new Float32Array(chunkSize);
+        Lp.set(Lc); Rp.set(Rc);
+        Lc = Lp; Rc = Rp;
+      }
+      if(onProgress) onProgress(chunkIdx/totalChunks, '🧬 AI 스템 분리 중... 청크 '+chunkIdx+'/'+totalChunks);
+      const out = await runMdxChunk(session, Lc, Rc);
+      for(let k=0;k<chunkActual;k++){
+        const w = window[k];
+        resultL[start+k] += out.L[k]*w;
+        resultR[start+k] += out.R[k]*w;
+        divider[start+k] += w;
+      }
+      await yieldUI();
+    }
+
+    const instL = new Float32Array(origLen), instR = new Float32Array(origLen);
+    for(let i=0;i<origLen;i++){
+      const idx = trim+i, d = divider[idx];
+      instL[i] = d>1e-8 ? resultL[idx]/d : 0;
+      instR[i] = d>1e-8 ? resultR[idx]/d : 0;
+    }
+    const vocL = new Float32Array(origLen), vocR = new Float32Array(origLen);
+    for(let i=0;i<origLen;i++){
+      vocL[i] = L[i] - instL[i]*MDX_COMPENSATE;
+      vocR[i] = R[i] - instR[i]*MDX_COMPENSATE;
+    }
+
+    let vocalsOut = [vocL, vocR], instOut = [instL, instR];
+    if(MDX_SR !== fs){
+      vocalsOut = await resampleTo(vocalsOut, MDX_SR, fs);
+      instOut = await resampleTo(instOut, MDX_SR, fs);
+    }
+    return { vocals: vocalsOut, instrumental: instOut };
+  }
+
   // Detects and attenuates narrowband spectral spikes above ~5kHz that are
   // characteristic of AI vocoder / diffusion-model artifacts (comb-like ringing,
   // metallic warble) — distinct from natural broadband harmonic content.
@@ -1155,6 +1511,21 @@
     return { hfRatio, lowRatio, correlation };
   }
 
+  // Average energy above `freq`, expressed in dB — used to log measured
+  // before/after effect of a stage rather than just the setting that was applied.
+  function bandEnergyDb(mono, fs, freq){
+    const hp = makeBiquad('highpass', fs, freq, 0, 0.707);
+    const out = runBiquad(hp, mono.slice());
+    let e=0; for(let i=0;i<out.length;i++) e+=out[i]*out[i];
+    return 10*Math.log10(e/out.length + 1e-12);
+  }
+  function stereoCorrelation(L, R){
+    let sumLR=0, sumLL=0, sumRR=0;
+    for(let i=0;i<L.length;i++){ sumLR+=L[i]*R[i]; sumLL+=L[i]*L[i]; sumRR+=R[i]*R[i]; }
+    const denom = Math.sqrt(sumLL*sumRR);
+    return denom>0 ? sumLR/denom : 1;
+  }
+
   // ================= Smart EQ: per-band spectral balance analysis =================
   // Splits the track into the same 7 bands as the EQ (via successive highpass
   // energy subtraction), then nudges outlier bands toward the track's own
@@ -1190,6 +1561,68 @@
   }
   const PRESET_LABELS = { standard:'Standard', clean:'Clean', punchy:'Punchy', warm:'Warm', airy:'Airy', vshape:'V-Shape' };
 
+  // ================= Vocal saturation & jitter ("AI 티" 줄이기) =================
+  // No real stem separation here — approximates "vocal-only" processing by
+  // limiting to the 250Hz-4kHz band most vocals sit in (same successive-
+  // highpass-subtraction trick as analyzeSpectralBalance above), so bass/
+  // kick/cymbals pass through mostly untouched.
+  function saturateSample(x, driveAmt){ // driveAmt: 0..1
+    if(driveAmt<=0) return x;
+    const drive = 1 + driveAmt*9;
+    const biased = x + 0.15*driveAmt*x*x; // small asymmetric term adds even-order (tube-like) harmonics
+    return Math.tanh(biased*drive) / Math.tanh(drive);
+  }
+  // Filtered white noise (slow ~5Hz wander) — used to modulate a micro-delay
+  // so pitch/timing drift feels organic rather than a robotic sine-wave vibrato.
+  function generateSmoothNoise(n, fs, cutoffHz){
+    const alpha = 1 - Math.exp(-2*Math.PI*cutoffHz/fs);
+    const noise = new Float32Array(n);
+    let prev = 0, peak = 1e-6;
+    for(let i=0;i<n;i++){
+      prev += alpha*((Math.random()*2-1)-prev);
+      noise[i] = prev;
+      if(Math.abs(prev)>peak) peak = Math.abs(prev);
+    }
+    for(let i=0;i<n;i++) noise[i] /= peak; // normalize to -1..1
+    return noise;
+  }
+  function applyJitter(data, fs, jitterAmt, noise){ // jitterAmt: 0..1, noise shared across channels
+    if(jitterAmt<=0) return data;
+    const maxDelayMs = 0.15 + jitterAmt*1.2; // up to ~1.35ms jitter depth
+    const maxDelaySamples = maxDelayMs/1000*fs;
+    const baseDelay = maxDelaySamples + 2; // fixed inaudible offset so we always read behind
+    const out = new Float32Array(data.length);
+    for(let i=0;i<data.length;i++){
+      const readPos = i - (baseDelay + noise[i]*maxDelaySamples);
+      const idx0 = Math.floor(readPos), frac = readPos-idx0;
+      const s0 = idx0>=0 ? data[idx0] : 0;
+      const s1 = (idx0+1)>=0 && (idx0+1)<data.length ? data[idx0+1] : 0;
+      out[i] = s0 + (s1-s0)*frac; // linear interpolation (jitter depth is sub-ms, plenty accurate)
+    }
+    return out;
+  }
+  function vocalSaturateJitter(data, fs, driveAmt, jitterAmt, sharedNoise){
+    if(driveAmt<=0 && jitterAmt<=0) return data;
+    const bandLow = runBiquad(makeBiquad('highpass', fs, 250, 0, 0.707), data.slice());
+    const aboveHi = runBiquad(makeBiquad('highpass', fs, 4000, 0, 0.707), data.slice());
+    const vocalBand = new Float32Array(data.length);
+    for(let i=0;i<data.length;i++) vocalBand[i] = bandLow[i]-aboveHi[i];
+    const residual = new Float32Array(data.length);
+    for(let i=0;i<data.length;i++) residual[i] = data[i]-vocalBand[i];
+
+    let processed = vocalBand;
+    if(driveAmt>0){
+      const out = new Float32Array(processed.length);
+      for(let i=0;i<out.length;i++) out[i] = saturateSample(processed[i], driveAmt);
+      processed = out;
+    }
+    if(jitterAmt>0) processed = applyJitter(processed, fs, jitterAmt, sharedNoise);
+
+    const result = new Float32Array(data.length);
+    for(let i=0;i<data.length;i++) result[i] = residual[i] + processed[i];
+    return result;
+  }
+
   // ================= DSP chain =================
   function processAudio(){
     if(!state.originalBuffer) return;
@@ -1213,6 +1646,8 @@
     const aiDenoiseAmt = parseFloat($('aiDenoiseAmt').value)/100;
     if(aiDenoiseAmt > 0){
       setProgress(2, 'AI 아티팩트 제거 중...');
+      const monoBefore = channels.length>1 ? channels[0].map((v,i)=>(v+channels[1][i])*0.5) : channels[0];
+      const hfBeforeDb = bandEnergyDb(monoBefore, fs, 5000);
       const denoised = [];
       for(let c=0;c<channels.length;c++){
         denoised.push(await spectralAIDenoise(channels[c], fs, aiDenoiseAmt, (f)=>{
@@ -1221,7 +1656,9 @@
         }));
       }
       channels = denoised;
-      log('AI 아티팩트 제거 적용 ('+Math.round(aiDenoiseAmt*100)+'%) — 스펙트럴 스파이크 감쇠');
+      const monoAfter = channels.length>1 ? channels[0].map((v,i)=>(v+channels[1][i])*0.5) : channels[0];
+      const hfAfterDb = bandEnergyDb(monoAfter, fs, 5000);
+      log('[02] AI 아티팩트 제거 적용 ('+Math.round(aiDenoiseAmt*100)+'%) — 5kHz+ 대역 에너지 '+hfBeforeDb.toFixed(1)+' → '+hfAfterDb.toFixed(1)+'dB ('+(hfAfterDb-hfBeforeDb>=0?'+':'')+(hfAfterDb-hfBeforeDb).toFixed(1)+'dB)');
     } else {
       setProgress(60);
     }
@@ -1238,9 +1675,52 @@
         out = runBiquad(c2, out);
         return out;
       });
-      log('고역 노이즈 억제 적용 ('+Math.round(noiseAmt*100)+'%)');
+      log('[02] 고역 노이즈 억제 적용 ('+Math.round(noiseAmt*100)+'%) — 10.5kHz '+peakCutDb.toFixed(1)+'dB, 13kHz+ shelf '+shelfCutDb.toFixed(1)+'dB');
     }
-    setProgress(65, 'EQ / 스테레오 폭 처리 중...');
+
+    // 3) 보컬 새츄레이션 & 지터 — 실제 AI 스템 분리(베타) 또는 250Hz~4kHz 대역 제한 근사
+    const satAmt = parseFloat($('satAmt').value)/100;
+    const jitterAmt = parseFloat($('jitterAmt').value)/100;
+    const useStemSep = $('stemSeparate').checked;
+    if(satAmt > 0 || jitterAmt > 0){
+      let stemsOk = false;
+      if(useStemSep){
+        try{
+          setProgress(65, '🧬 AI 스템 분리 준비 중...');
+          const sep = await separateStemsFull(channels, fs, (frac, label)=>{
+            setProgress(65 + frac*20, label || '🧬 AI 스템 분리 중...');
+          });
+          const sharedNoise = jitterAmt > 0 ? generateSmoothNoise(channels[0].length, fs, 5) : null;
+          const vocalsProcessed = sep.vocals.map(ch => {
+            let out = ch;
+            if(satAmt>0){
+              const o = new Float32Array(out.length);
+              for(let i=0;i<o.length;i++) o[i] = saturateSample(out[i], satAmt);
+              out = o;
+            }
+            if(jitterAmt>0) out = applyJitter(out, fs, jitterAmt, sharedNoise);
+            return out;
+          });
+          channels = channels.map((ch,c)=>{
+            const inst = sep.instrumental[c] || sep.instrumental[0];
+            const voc = vocalsProcessed[c] || vocalsProcessed[0];
+            const out = new Float32Array(ch.length);
+            for(let i=0;i<out.length;i++) out[i] = inst[i] + voc[i];
+            return out;
+          });
+          log('[03] 🧬 실제 AI 스템 분리 적용 (신경망으로 보컬/반주 완전 분리 후 개별 처리) — 새츄레이션 '+Math.round(satAmt*100)+'% · 지터 '+Math.round(jitterAmt*100)+'%');
+          stemsOk = true;
+        } catch(err){
+          log('[03] ⚠ AI 스템 분리 실패 ('+err.message+') — 대역 제한 근사 방식으로 자동 전환', 'warn');
+        }
+      }
+      if(!stemsOk){
+        const sharedNoise = jitterAmt > 0 ? generateSmoothNoise(channels[0].length, fs, 5) : null;
+        channels = channels.map(ch => vocalSaturateJitter(ch, fs, satAmt, jitterAmt, sharedNoise));
+        log('[03] 보컬 새츄레이션/지터 적용 (새츄레이션 '+Math.round(satAmt*100)+'% · 지터 '+Math.round(jitterAmt*100)+'%) — 250Hz~4kHz 중역대에만 적용');
+      }
+    }
+    setProgress(85, 'EQ / 스테레오 폭 처리 중...');
 
     // 2) Tone EQ (5 band)
     const eqGains = Array.from(document.querySelectorAll('.eqSlider')).map(s=>parseFloat(s.value));
@@ -1257,12 +1737,14 @@
         }
         return out;
       });
-      log('EQ 적용: '+eqGains.map((g,i)=>eqFreqs[i]+'Hz '+(g>0?'+':'')+g+'dB').join(', '));
+      const changedBands = eqGains.map((g,i)=>({g,i})).filter(x=>x.g!==0);
+      log('[04] EQ 적용: '+changedBands.length+'개 밴드 조정 — '+changedBands.map(x=>eqFreqs[x.i]+'Hz '+(x.g>0?'+':'')+x.g+'dB').join(', '));
     }
 
     // 3) Stereo width (mid-side)
     const widthPct = parseFloat($('widthAmt').value)/100;
     if(numCh>=2 && widthPct !== 1){
+      const corrBefore = stereoCorrelation(channels[0], channels[1]);
       const L = channels[0], R = channels[1];
       const newL = new Float32Array(L.length);
       const newR = new Float32Array(R.length);
@@ -1273,7 +1755,8 @@
         newR[i] = mid-side;
       }
       channels[0]=newL; channels[1]=newR;
-      log('스테레오 폭 조절: '+Math.round(widthPct*100)+'%');
+      const corrAfter = stereoCorrelation(newL, newR);
+      log('[05] 스테레오 폭 조절: 100% → '+Math.round(widthPct*100)+'% (좌우 상관도 '+corrBefore.toFixed(2)+' → '+corrAfter.toFixed(2)+')');
     }
     setProgress(72, '음압 보정 중...');
 
@@ -1285,7 +1768,7 @@
     for(const ch of channels){
       for(let i=0;i<ch.length;i++) ch[i] *= gainLin;
     }
-    log('음압 보정: '+measuredLufs.toFixed(1)+' → '+targetLufs+' LUFS ('+(gainDb>0?'+':'')+gainDb.toFixed(1)+'dB 게인)');
+    log('[06] 음압 보정: '+measuredLufs.toFixed(1)+' → '+targetLufs+' LUFS ('+(gainDb>0?'+':'')+gainDb.toFixed(1)+'dB 게인)');
 
     // 5) Sample-peak safety limiter (lookahead brickwall)
     setProgress(78, '리미터 처리 중...');
@@ -1317,8 +1800,12 @@
           gainEnv[i] = Math.min(gainEnv[i], gainEnv[i-1]+maxStep);
         }
       }
+      let minGain = 1;
+      for(let i=0;i<n;i++) if(gainEnv[i]<minGain) minGain=gainEnv[i];
       for(const ch of channels) for(let i=0;i<n;i++) ch[i] *= gainEnv[i];
-      log('리미터 작동: 샘플 피크를 '+ceilingDb.toFixed(1)+'dB 이하로 제한', 'warn');
+      const peakBeforeDb = 20*Math.log10(peakAfter+1e-12);
+      const reductionDb = 20*Math.log10(minGain+1e-12);
+      log('[06] 리미터 작동: 피크 '+peakBeforeDb.toFixed(1)+'dBFS → 천장 '+ceilingDb.toFixed(1)+'dB 이하 (최대 '+reductionDb.toFixed(1)+'dB 게인 리덕션)', 'warn');
     }
 
     // 6) True-peak (dBTP) verification — sample-peak limiting alone can leave
@@ -1332,8 +1819,9 @@
       const extraGainDb = ceilingDb - truePeakDb - 0.1; // small extra margin
       const extraGainLin = Math.pow(10, extraGainDb/20);
       for(const ch of channels) for(let i=0;i<ch.length;i++) ch[i] *= extraGainLin;
-      log('트루피크 보정: 인터샘플 오버 감지 · 추가 '+extraGainDb.toFixed(1)+'dB 트림', 'warn');
-      truePeakDb += extraGainDb;
+      const newTruePeakDb = truePeakDb + extraGainDb;
+      log('[06] 트루피크 보정: '+truePeakDb.toFixed(1)+' → '+newTruePeakDb.toFixed(1)+'dBTP (인터샘플 오버 감지, 추가 '+extraGainDb.toFixed(1)+'dB 트림)', 'warn');
+      truePeakDb = newTruePeakDb;
     }
     setProgress(97, '마무리 중...');
 
@@ -1345,7 +1833,7 @@
     updateLufsDisplay('proc', finalLufs);
     drawVU(finalLufs);
     refreshWaveform();
-    log('마스터링 완료 · 최종 '+finalLufs.toFixed(1)+' LUFS, 트루피크 '+truePeakDb.toFixed(1)+' dBTP', 'ok');
+    log('마스터링 완료 · LUFS '+state.origLufsVal.toFixed(1)+' → '+finalLufs.toFixed(1)+', 트루피크 '+state.peakDb.toFixed(1)+' → '+truePeakDb.toFixed(1)+' dBTP', 'ok');
 
     $('btnExport').disabled = false;
     $('btnExportMp3').disabled = false;
@@ -1386,28 +1874,33 @@
         widthVal = Math.round(Math.max(85, Math.min(130, 100 + (a.correlation-0.8)*120)));
       }
 
-      // gentle spectral tilt correction: bass-light -> nudge low bands up, harsh top -> nudge high bands down
-      const lowNudge = a.lowRatio < 0.28 ? Math.round((0.28-a.lowRatio)*20) : (a.lowRatio>0.5 ? -Math.round((a.lowRatio-0.5)*14) : 0);
-      const highNudge = norm > 0.5 ? -Math.round((norm-0.5)*10) : Math.round((0.3-norm)*8);
-
+      // full 7-band spectral balance analysis (same engine as the 스마트 EQ 추천 button)
+      const bandDb = analyzeSpectralBalance(channels, buf.sampleRate);
+      const eqSuggestion = suggestSmartEQ(bandDb);
       document.querySelectorAll('.eqSlider').forEach((sl,i)=>{
-        let v = 0;
-        if(i===0) v = Math.max(-4, Math.min(4, lowNudge));       // Sub 60Hz
-        if(i===1) v = Math.max(-3, Math.min(3, Math.round(lowNudge*0.6))); // Bass 150Hz
-        if(i===5) v = Math.max(-4, Math.min(4, Math.round(highNudge*0.7))); // Pres 6kHz
-        if(i===6) v = Math.max(-5, Math.min(5, highNudge));      // Air 12kHz
-        sl.value = v;
-        $('eqVal'+i).textContent = (v>0?'+':'')+v+'dB';
+        sl.value = eqSuggestion[i];
+        $('eqVal'+i).textContent = (eqSuggestion[i]>0?'+':'')+eqSuggestion[i]+'dB';
       });
       $('presetSelect').value = 'custom';
+      const nearestKey = nearestPresetKey(eqSuggestion);
+      const hint = $('eqHint');
+      hint.style.display = 'block';
+      hint.textContent = '✦ 원클릭 자동 마스터링에서 스마트 EQ 적용됨 · 가장 비슷한 프리셋: '+PRESET_LABELS[nearestKey];
 
       $('noiseAmt').value = noiseVal; $('noiseAmtVal').textContent = noiseVal+'%';
       $('aiDenoiseAmt').value = aiVal; $('aiDenoiseAmtVal').textContent = aiVal+'%';
       $('widthAmt').value = widthVal; $('widthAmtVal').textContent = widthVal+'%';
       $('targetLufs').value = -14; $('targetLufsVal').textContent = '-14 LUFS';
 
+      // sat/jitter: no reliable signal-based way to detect "how AI-sounding"
+      // a track is without pitch/onset detection (out of scope here), so
+      // apply a modest fixed default that's subtle enough to be safe.
+      const satVal = 15, jitterVal = 10;
+      $('satAmt').value = satVal; $('satAmtVal').textContent = satVal+'%';
+      $('jitterAmt').value = jitterVal; $('jitterAmtVal').textContent = jitterVal+'%';
+
       log('분석 결과 — 고역 에너지 비율 '+(a.hfRatio*100).toFixed(1)+'%, 좌우상관 '+a.correlation.toFixed(2)+', 저역비율 '+(a.lowRatio*100).toFixed(0)+'%', 'ok');
-      log('자동 설정 → AI아티팩트 '+aiVal+'% · 톤노이즈 '+noiseVal+'% · 스테레오폭 '+widthVal+'% · 목표 -14 LUFS', 'ok');
+      log('자동 설정 → AI아티팩트 '+aiVal+'% · 톤노이즈 '+noiseVal+'% · 스테레오폭 '+widthVal+'% · 새츄레이션 '+satVal+'% · 지터 '+jitterVal+'% · 목표 -14 LUFS · EQ 유사 프리셋 '+PRESET_LABELS[nearestKey], 'ok');
 
       $('btnProcess').disabled = false;
       processAudio();

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>스템 분리 모델 스모크 테스트</title>
+<script src="../vendor/ort/ort.wasm.min.js"></script>
+</head>
+<body style="font-family:monospace; background:#111; color:#eee; padding:20px;">
+<h1>UVR-MDX-NET-Inst_HQ_5 스모크 테스트</h1>
+<p>세션 생성 + 추론이 실제 브라우저(WASM)에서 크래시/NaN 없이 도는지 확인하는 회귀 테스트입니다.
+실제 오디오가 아닌 고정 시드의 결정론적 텐서를 입력으로 씁니다 — 분리 품질이 아니라
+"모델이 정상적으로 로드되고 돌아가는지"만 검증합니다.</p>
+<pre id="out">실행 중...</pre>
+<script>
+(async () => {
+  const out = document.getElementById('out');
+  const log = (msg) => { out.textContent += '\n' + msg; };
+  try {
+    // no explicit wasmPaths — ort-web auto-resolves relative to its own <script src>
+    ort.env.wasm.numThreads = 1;
+
+    const t0 = performance.now();
+    const session = await ort.InferenceSession.create('./UVR-MDX-NET-Inst_HQ_5.onnx', { executionProviders: ['wasm'] });
+    const t1 = performance.now();
+    log('세션 생성 완료: ' + Math.round(t1 - t0) + 'ms');
+    log('입력: ' + JSON.stringify(session.inputNames) + ', 출력: ' + JSON.stringify(session.outputNames));
+
+    // deterministic pseudo-random input matching the model's [1,4,2560,256] contract
+    const dims = [1, 4, 2560, 256];
+    const total = dims.reduce((a, b) => a * b, 1);
+    const data = new Float32Array(total);
+    let seed = 42;
+    for (let i = 0; i < total; i++) {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      data[i] = ((seed / 0x7fffffff) * 2 - 1) * 5; // roughly matches real spectrogram magnitude range
+    }
+    const inputTensor = new ort.Tensor('float32', data, dims);
+
+    const t2 = performance.now();
+    const results = await session.run({ input: inputTensor });
+    const t3 = performance.now();
+    log('추론 완료: ' + Math.round(t3 - t2) + 'ms');
+
+    const outData = results[session.outputNames[0]].data;
+    let min = Infinity, max = -Infinity, nanCount = 0;
+    for (let i = 0; i < outData.length; i++) {
+      const v = outData[i];
+      if (Number.isNaN(v)) { nanCount++; continue; }
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+    log('출력 길이: ' + outData.length + ' (기대값: ' + total + ')');
+    log('출력 범위: [' + min.toFixed(3) + ', ' + max.toFixed(3) + '], NaN 개수: ' + nanCount);
+
+    const pass = outData.length === total && nanCount === 0 && isFinite(min) && isFinite(max);
+    log('');
+    log(pass ? '✅ PASS — 모델이 정상적으로 로드/실행됨' : '❌ FAIL');
+    window.__smokeTestResult = { pass, min, max, nanCount, outputLength: outData.length, sessionMs: Math.round(t1-t0), inferMs: Math.round(t3-t2) };
+  } catch (e) {
+    log('❌ ERROR: ' + e.message);
+    window.__smokeTestResult = { pass: false, error: e.message };
+  }
+})();
+</script>
+</body>
+</html>
