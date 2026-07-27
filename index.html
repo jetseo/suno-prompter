@@ -124,6 +124,7 @@
     </div>
   </div>
   <div style="display:flex;align-items:center;gap:10px;">
+    <a href="mastering.html" style="font-family:var(--sans);font-size:11px;color:var(--accent2);border:1px solid var(--border);border-radius:6px;padding:6px 12px;text-decoration:none;">🎚 마스터링 툴</a>
     <div style="font-family:var(--mono);font-size:11px;color:var(--text3)">v2.0</div>
     <button id="resetAllBtn" onclick="resetAll()">전체 초기화</button>
   </div>
@@ -495,12 +496,22 @@ const MODIFIERS_EN = ['more emotional','more energetic','more cinematic','more m
 
 const TAB_NAMES = ['스타일','스토리','분위기','템포','악기','보컬','기타'];
 
+// ─── 곡 구조 템플릿 (장르별 표준 기승전결, Suno Lyrics 태그용) ───
+const SONG_FORMS = [
+  {name:'K-Pop 댄스',  desc:'후렴 반복과 댄스 브레이크가 있는 팝 댄스 구조', tags:['Intro','Verse 1','Verse 2','Chorus','Dance Beat Break','Bridge','Chorus','Outro']},
+  {name:'힙합 / R&B',  desc:'비트 드랍과 훅 반복 중심의 힙합/R&B 구조',       tags:['Intro','Beat Drop','Rap Verse 1','Hook','Rap Verse 2','Hook','Outro']},
+  {name:'시티팝',      desc:'연주 솔로가 들어간 세련된 시티팝 구조',         tags:['Intro','Verse 1','Verse 2','Chorus','Instrumental Solo','Bridge','Chorus','Outro']},
+  {name:'발라드',      desc:'벌스가 하나 더 있는 감정 고조형 발라드 구조',   tags:['Intro','Verse 1','Verse 2','Chorus','Verse 3','Bridge','Chorus','Outro']},
+  {name:'모던 록',      desc:'기타 솔로가 들어간 정통 모던 록 구조',         tags:['Intro','Verse 1','Verse 2','Chorus','Guitar Solo','Bridge','Chorus','Outro']},
+];
+
 // ─── STATE ───
 let S = {
   tab:0, region:null, country:null, genre:null,
   stories:[], moods:[], bpm:107, bpmPreset:null, bpmTouched:false,
   instruments:[], vocal:null, customStory:'',
   extras:[], modifiers:[], copied:false,
+  songForm:null, songFormCopied:false,
 };
 
 // ─── PROMPT BUILDER (영문 출력) ───
@@ -655,7 +666,13 @@ function renderRight() {
     <div class="mod-grid">
       ${MODIFIERS_KO.map((m,i)=>makeBtn(`mod-btn ${S.modifiers.includes(m)?'active':''}`,`onclick="toggleModIdx(${i})"`,m,MODIFIER_DESC[m]||'')).join('')}
     </div>
-    ${modPrompt?`<div class="mod-result">${modPrompt}</div>`:''}`;
+    ${modPrompt?`<div class="mod-result">${modPrompt}</div>`:''}
+    <div class="mod-title" style="margin-top:18px">곡 구조 템플릿 (Lyrics 태그)</div>
+    <div class="mod-grid">
+      ${SONG_FORMS.map((f,i)=>makeBtn(`mod-btn ${S.songForm===i?'active':''}`,`onclick="setSongForm(${i})"`,f.name,f.desc)).join('')}
+    </div>
+    ${S.songForm!==null?`<div class="mod-result" style="white-space:pre-line">${SONG_FORMS[S.songForm].tags.map(t=>'['+t+']').join('\n\n')}</div>
+    <button class="copy-btn ${S.songFormCopied?'copied':''}" style="margin-top:8px" onclick="copySongForm()">${S.songFormCopied?'✓ 복사됨':'구조 태그 복사'}</button>`:''}`;
 }
 
 function render() { renderTabs(); renderLeft(); renderMid(); renderRight(); }
@@ -682,8 +699,17 @@ function toggleExtra(e){S.extras=S.extras.includes(e)?S.extras.filter(x=>x!==e):
 function toggleExtraIdx(i){toggleExtra(EXTRAS_KO[i]);}
 function toggleMod(m){S.modifiers=S.modifiers.includes(m)?S.modifiers.filter(x=>x!==m):[...S.modifiers,m];render();}
 function toggleModIdx(i){toggleMod(MODIFIERS_KO[i]);}
+function setSongForm(i){S.songForm=S.songForm===i?null:i;S.songFormCopied=false;render();}
+function copySongForm(){
+  if(S.songForm===null)return;
+  const text=SONG_FORMS[S.songForm].tags.map(t=>'['+t+']').join('\n\n');
+  navigator.clipboard.writeText(text).then(()=>{
+    S.songFormCopied=true;render();
+    setTimeout(()=>{S.songFormCopied=false;render();},2000);
+  });
+}
 function resetAll(){
-  S={tab:S.tab,region:null,country:null,genre:null,stories:[],moods:[],bpm:107,bpmPreset:null,bpmTouched:false,instruments:[],vocal:null,customStory:'',extras:[],modifiers:[],copied:false};
+  S={tab:S.tab,region:null,country:null,genre:null,stories:[],moods:[],bpm:107,bpmPreset:null,bpmTouched:false,instruments:[],vocal:null,customStory:'',extras:[],modifiers:[],copied:false,songForm:null,songFormCopied:false};
   render();
 }
 function resetTab(){
