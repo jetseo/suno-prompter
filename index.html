@@ -307,9 +307,25 @@
     </div>
   </div>
 
-  <!-- 3. Character 프리셋 & EQ -->
+  <!-- 3. 보컬 새츄레이션 & 지터 -->
   <div class="module">
-    <h2><span class="num">03</span>음색 성향(Character) &amp; 7밴드 EQ</h2>
+    <h2><span class="num">03</span>보컬 새츄레이션 &amp; 지터 (AI 티 줄이기)</h2>
+    <div class="row">
+      <label>새츄레이션<span class="sub">아날로그 테이프/진공관 질감의 배음 추가</span></label>
+      <input type="range" id="satAmt" min="0" max="100" value="0">
+      <div class="rowVal" id="satAmtVal">0%</div>
+    </div>
+    <div class="row">
+      <label>피치/타이밍 지터<span class="sub">미세한 흔들림으로 기계적인 정확함 완화</span></label>
+      <input type="range" id="jitterAmt" min="0" max="100" value="0">
+      <div class="rowVal" id="jitterAmtVal">0%</div>
+    </div>
+    <div class="smartHint" style="display:block; margin-top:12px;">✦ 완전한 보컬 분리가 아닌, 보컬이 주로 위치하는 중역대(250Hz~4kHz)에만 적용됩니다. 베이스·킥·심벌 등은 거의 영향받지 않습니다.</div>
+  </div>
+
+  <!-- 4. Character 프리셋 & EQ -->
+  <div class="module">
+    <h2><span class="num">04</span>음색 성향(Character) &amp; 7밴드 EQ</h2>
     <button id="btnSmartEq" class="ghost" disabled style="width:100%; margin-bottom:12px;">🧠 스마트 EQ 추천 — 곡 스펙트럼 분석 후 밴드 자동 보정</button>
     <div class="smartHint" id="eqHint" style="display:none;"></div>
     <select id="presetSelect">
@@ -341,9 +357,9 @@
     </div>
   </div>
 
-  <!-- 4. 스테레오 폭 -->
+  <!-- 5. 스테레오 폭 -->
   <div class="module">
-    <h2><span class="num">04</span>스테레오 폭 조절</h2>
+    <h2><span class="num">05</span>스테레오 폭 조절</h2>
     <div class="row">
       <label>스테레오 폭<span class="sub">100% = 원본 · 0% = 모노</span></label>
       <input type="range" id="widthAmt" min="0" max="200" value="100">
@@ -351,9 +367,9 @@
     </div>
   </div>
 
-  <!-- 5. 최종 음압 보정 -->
+  <!-- 6. 최종 음압 보정 -->
   <div class="module">
-    <h2><span class="num">05</span>최종 음압(LUFS) 보정</h2>
+    <h2><span class="num">06</span>최종 음압(LUFS) 보정</h2>
     <div class="row">
       <label>목표 러프니스<span class="sub">음원 사이트 권장 -14 ~ -10 LUFS</span></label>
       <input type="range" id="targetLufs" min="-20" max="-6" value="-14">
@@ -366,9 +382,9 @@
     </div>
   </div>
 
-  <!-- 6. 비교 & 저장 -->
+  <!-- 7. 비교 & 저장 -->
   <div class="module">
-    <h2><span class="num">06</span>파형 비교 &amp; 저장</h2>
+    <h2><span class="num">07</span>파형 비교 &amp; 저장</h2>
     <canvas id="waveCanvas" width="900" height="120"></canvas>
     <div class="waveLegend" id="waveLegend"></div>
     <canvas id="specCanvas" width="900" height="64"></canvas>
@@ -828,12 +844,12 @@
   // ================= Presets (Character) =================
   // band order: [Sub 60Hz, Bass 150Hz, L-Mid 400Hz, Mid 1kHz, H-Mid 2.5kHz, Pres 6kHz, Air 12kHz]
   const PRESETS = {
-    standard: {eq:[0,0,0,0,0,0,0],      noise:20, ai:25, width:100},
-    clean:    {eq:[0,-1,-2,-1,2,2,1],   noise:45, ai:55, width:100},
-    punchy:   {eq:[4,3,-1,0,1,1,0],     noise:25, ai:30, width:95},
-    warm:     {eq:[2,3,2,0,-1,-2,-3],   noise:35, ai:40, width:90},
-    airy:     {eq:[-1,-1,-1,0,2,3,5],   noise:30, ai:45, width:130},
-    vshape:   {eq:[3,2,-2,-3,0,2,4],    noise:30, ai:35, width:115},
+    standard: {eq:[0,0,0,0,0,0,0],      noise:20, ai:25, width:100, sat:0,  jitter:0},
+    clean:    {eq:[0,-1,-2,-1,2,2,1],   noise:45, ai:55, width:100, sat:0,  jitter:0},
+    punchy:   {eq:[4,3,-1,0,1,1,0],     noise:25, ai:30, width:95,  sat:15, jitter:5},
+    warm:     {eq:[2,3,2,0,-1,-2,-3],   noise:35, ai:40, width:90,  sat:25, jitter:10},
+    airy:     {eq:[-1,-1,-1,0,2,3,5],   noise:30, ai:45, width:130, sat:10, jitter:15},
+    vshape:   {eq:[3,2,-2,-3,0,2,4],    noise:30, ai:35, width:115, sat:15, jitter:5},
   };
 
   function applyPreset(name){
@@ -850,6 +866,10 @@
     $('aiDenoiseAmtVal').textContent = p.ai+'%';
     $('widthAmt').value = p.width;
     $('widthAmtVal').textContent = p.width+'%';
+    $('satAmt').value = p.sat;
+    $('satAmtVal').textContent = p.sat+'%';
+    $('jitterAmt').value = p.jitter;
+    $('jitterAmtVal').textContent = p.jitter+'%';
   }
 
   $('presetSelect').addEventListener('change', (e)=> applyPreset(e.target.value));
@@ -887,6 +907,14 @@
     $('widthAmtVal').textContent = e.target.value+'%';
     $('presetSelect').value = 'custom';
   });
+  $('satAmt').addEventListener('input', (e)=>{
+    $('satAmtVal').textContent = e.target.value+'%';
+    $('presetSelect').value = 'custom';
+  });
+  $('jitterAmt').addEventListener('input', (e)=>{
+    $('jitterAmtVal').textContent = e.target.value+'%';
+    $('presetSelect').value = 'custom';
+  });
   $('targetLufs').addEventListener('input', (e)=>{
     $('targetLufsVal').textContent = e.target.value+' LUFS';
   });
@@ -909,6 +937,8 @@
       noise: parseFloat($('noiseAmt').value),
       ai: parseFloat($('aiDenoiseAmt').value),
       width: parseFloat($('widthAmt').value),
+      sat: parseFloat($('satAmt').value),
+      jitter: parseFloat($('jitterAmt').value),
       targetLufs: parseFloat($('targetLufs').value),
       ceiling: parseFloat($('ceiling').value),
     };
@@ -921,6 +951,8 @@
     $('noiseAmt').value = p.noise; $('noiseAmtVal').textContent = p.noise+'%';
     $('aiDenoiseAmt').value = p.ai; $('aiDenoiseAmtVal').textContent = p.ai+'%';
     $('widthAmt').value = p.width; $('widthAmtVal').textContent = p.width+'%';
+    $('satAmt').value = p.sat||0; $('satAmtVal').textContent = (p.sat||0)+'%';
+    $('jitterAmt').value = p.jitter||0; $('jitterAmtVal').textContent = (p.jitter||0)+'%';
     $('targetLufs').value = p.targetLufs; $('targetLufsVal').textContent = p.targetLufs+' LUFS';
     $('ceiling').value = p.ceiling; $('ceilingVal').textContent = parseFloat(p.ceiling).toFixed(1)+' dB';
     $('presetSelect').value = 'custom';
@@ -1239,6 +1271,68 @@
   }
   const PRESET_LABELS = { standard:'Standard', clean:'Clean', punchy:'Punchy', warm:'Warm', airy:'Airy', vshape:'V-Shape' };
 
+  // ================= Vocal saturation & jitter ("AI 티" 줄이기) =================
+  // No real stem separation here — approximates "vocal-only" processing by
+  // limiting to the 250Hz-4kHz band most vocals sit in (same successive-
+  // highpass-subtraction trick as analyzeSpectralBalance above), so bass/
+  // kick/cymbals pass through mostly untouched.
+  function saturateSample(x, driveAmt){ // driveAmt: 0..1
+    if(driveAmt<=0) return x;
+    const drive = 1 + driveAmt*9;
+    const biased = x + 0.15*driveAmt*x*x; // small asymmetric term adds even-order (tube-like) harmonics
+    return Math.tanh(biased*drive) / Math.tanh(drive);
+  }
+  // Filtered white noise (slow ~5Hz wander) — used to modulate a micro-delay
+  // so pitch/timing drift feels organic rather than a robotic sine-wave vibrato.
+  function generateSmoothNoise(n, fs, cutoffHz){
+    const alpha = 1 - Math.exp(-2*Math.PI*cutoffHz/fs);
+    const noise = new Float32Array(n);
+    let prev = 0, peak = 1e-6;
+    for(let i=0;i<n;i++){
+      prev += alpha*((Math.random()*2-1)-prev);
+      noise[i] = prev;
+      if(Math.abs(prev)>peak) peak = Math.abs(prev);
+    }
+    for(let i=0;i<n;i++) noise[i] /= peak; // normalize to -1..1
+    return noise;
+  }
+  function applyJitter(data, fs, jitterAmt, noise){ // jitterAmt: 0..1, noise shared across channels
+    if(jitterAmt<=0) return data;
+    const maxDelayMs = 0.15 + jitterAmt*1.2; // up to ~1.35ms jitter depth
+    const maxDelaySamples = maxDelayMs/1000*fs;
+    const baseDelay = maxDelaySamples + 2; // fixed inaudible offset so we always read behind
+    const out = new Float32Array(data.length);
+    for(let i=0;i<data.length;i++){
+      const readPos = i - (baseDelay + noise[i]*maxDelaySamples);
+      const idx0 = Math.floor(readPos), frac = readPos-idx0;
+      const s0 = idx0>=0 ? data[idx0] : 0;
+      const s1 = (idx0+1)>=0 && (idx0+1)<data.length ? data[idx0+1] : 0;
+      out[i] = s0 + (s1-s0)*frac; // linear interpolation (jitter depth is sub-ms, plenty accurate)
+    }
+    return out;
+  }
+  function vocalSaturateJitter(data, fs, driveAmt, jitterAmt, sharedNoise){
+    if(driveAmt<=0 && jitterAmt<=0) return data;
+    const bandLow = runBiquad(makeBiquad('highpass', fs, 250, 0, 0.707), data.slice());
+    const aboveHi = runBiquad(makeBiquad('highpass', fs, 4000, 0, 0.707), data.slice());
+    const vocalBand = new Float32Array(data.length);
+    for(let i=0;i<data.length;i++) vocalBand[i] = bandLow[i]-aboveHi[i];
+    const residual = new Float32Array(data.length);
+    for(let i=0;i<data.length;i++) residual[i] = data[i]-vocalBand[i];
+
+    let processed = vocalBand;
+    if(driveAmt>0){
+      const out = new Float32Array(processed.length);
+      for(let i=0;i<out.length;i++) out[i] = saturateSample(processed[i], driveAmt);
+      processed = out;
+    }
+    if(jitterAmt>0) processed = applyJitter(processed, fs, jitterAmt, sharedNoise);
+
+    const result = new Float32Array(data.length);
+    for(let i=0;i<data.length;i++) result[i] = residual[i] + processed[i];
+    return result;
+  }
+
   // ================= DSP chain =================
   function processAudio(){
     if(!state.originalBuffer) return;
@@ -1293,6 +1387,15 @@
       });
       log('[02] 고역 노이즈 억제 적용 ('+Math.round(noiseAmt*100)+'%) — 10.5kHz '+peakCutDb.toFixed(1)+'dB, 13kHz+ shelf '+shelfCutDb.toFixed(1)+'dB');
     }
+
+    // 3) 보컬 새츄레이션 & 지터 (250Hz~4kHz 대역 제한 근사 — 완전한 스템 분리 아님)
+    const satAmt = parseFloat($('satAmt').value)/100;
+    const jitterAmt = parseFloat($('jitterAmt').value)/100;
+    if(satAmt > 0 || jitterAmt > 0){
+      const sharedNoise = jitterAmt > 0 ? generateSmoothNoise(channels[0].length, fs, 5) : null;
+      channels = channels.map(ch => vocalSaturateJitter(ch, fs, satAmt, jitterAmt, sharedNoise));
+      log('[03] 보컬 새츄레이션/지터 적용 (새츄레이션 '+Math.round(satAmt*100)+'% · 지터 '+Math.round(jitterAmt*100)+'%) — 250Hz~4kHz 중역대에만 적용');
+    }
     setProgress(65, 'EQ / 스테레오 폭 처리 중...');
 
     // 2) Tone EQ (5 band)
@@ -1311,7 +1414,7 @@
         return out;
       });
       const changedBands = eqGains.map((g,i)=>({g,i})).filter(x=>x.g!==0);
-      log('[03] EQ 적용: '+changedBands.length+'개 밴드 조정 — '+changedBands.map(x=>eqFreqs[x.i]+'Hz '+(x.g>0?'+':'')+x.g+'dB').join(', '));
+      log('[04] EQ 적용: '+changedBands.length+'개 밴드 조정 — '+changedBands.map(x=>eqFreqs[x.i]+'Hz '+(x.g>0?'+':'')+x.g+'dB').join(', '));
     }
 
     // 3) Stereo width (mid-side)
@@ -1329,7 +1432,7 @@
       }
       channels[0]=newL; channels[1]=newR;
       const corrAfter = stereoCorrelation(newL, newR);
-      log('[04] 스테레오 폭 조절: 100% → '+Math.round(widthPct*100)+'% (좌우 상관도 '+corrBefore.toFixed(2)+' → '+corrAfter.toFixed(2)+')');
+      log('[05] 스테레오 폭 조절: 100% → '+Math.round(widthPct*100)+'% (좌우 상관도 '+corrBefore.toFixed(2)+' → '+corrAfter.toFixed(2)+')');
     }
     setProgress(72, '음압 보정 중...');
 
@@ -1341,7 +1444,7 @@
     for(const ch of channels){
       for(let i=0;i<ch.length;i++) ch[i] *= gainLin;
     }
-    log('[05] 음압 보정: '+measuredLufs.toFixed(1)+' → '+targetLufs+' LUFS ('+(gainDb>0?'+':'')+gainDb.toFixed(1)+'dB 게인)');
+    log('[06] 음압 보정: '+measuredLufs.toFixed(1)+' → '+targetLufs+' LUFS ('+(gainDb>0?'+':'')+gainDb.toFixed(1)+'dB 게인)');
 
     // 5) Sample-peak safety limiter (lookahead brickwall)
     setProgress(78, '리미터 처리 중...');
@@ -1378,7 +1481,7 @@
       for(const ch of channels) for(let i=0;i<n;i++) ch[i] *= gainEnv[i];
       const peakBeforeDb = 20*Math.log10(peakAfter+1e-12);
       const reductionDb = 20*Math.log10(minGain+1e-12);
-      log('[05] 리미터 작동: 피크 '+peakBeforeDb.toFixed(1)+'dBFS → 천장 '+ceilingDb.toFixed(1)+'dB 이하 (최대 '+reductionDb.toFixed(1)+'dB 게인 리덕션)', 'warn');
+      log('[06] 리미터 작동: 피크 '+peakBeforeDb.toFixed(1)+'dBFS → 천장 '+ceilingDb.toFixed(1)+'dB 이하 (최대 '+reductionDb.toFixed(1)+'dB 게인 리덕션)', 'warn');
     }
 
     // 6) True-peak (dBTP) verification — sample-peak limiting alone can leave
@@ -1393,7 +1496,7 @@
       const extraGainLin = Math.pow(10, extraGainDb/20);
       for(const ch of channels) for(let i=0;i<ch.length;i++) ch[i] *= extraGainLin;
       const newTruePeakDb = truePeakDb + extraGainDb;
-      log('[05] 트루피크 보정: '+truePeakDb.toFixed(1)+' → '+newTruePeakDb.toFixed(1)+'dBTP (인터샘플 오버 감지, 추가 '+extraGainDb.toFixed(1)+'dB 트림)', 'warn');
+      log('[06] 트루피크 보정: '+truePeakDb.toFixed(1)+' → '+newTruePeakDb.toFixed(1)+'dBTP (인터샘플 오버 감지, 추가 '+extraGainDb.toFixed(1)+'dB 트림)', 'warn');
       truePeakDb = newTruePeakDb;
     }
     setProgress(97, '마무리 중...');
@@ -1465,8 +1568,15 @@
       $('widthAmt').value = widthVal; $('widthAmtVal').textContent = widthVal+'%';
       $('targetLufs').value = -14; $('targetLufsVal').textContent = '-14 LUFS';
 
+      // sat/jitter: no reliable signal-based way to detect "how AI-sounding"
+      // a track is without pitch/onset detection (out of scope here), so
+      // apply a modest fixed default that's subtle enough to be safe.
+      const satVal = 15, jitterVal = 10;
+      $('satAmt').value = satVal; $('satAmtVal').textContent = satVal+'%';
+      $('jitterAmt').value = jitterVal; $('jitterAmtVal').textContent = jitterVal+'%';
+
       log('분석 결과 — 고역 에너지 비율 '+(a.hfRatio*100).toFixed(1)+'%, 좌우상관 '+a.correlation.toFixed(2)+', 저역비율 '+(a.lowRatio*100).toFixed(0)+'%', 'ok');
-      log('자동 설정 → AI아티팩트 '+aiVal+'% · 톤노이즈 '+noiseVal+'% · 스테레오폭 '+widthVal+'% · 목표 -14 LUFS · EQ 유사 프리셋 '+PRESET_LABELS[nearestKey], 'ok');
+      log('자동 설정 → AI아티팩트 '+aiVal+'% · 톤노이즈 '+noiseVal+'% · 스테레오폭 '+widthVal+'% · 새츄레이션 '+satVal+'% · 지터 '+jitterVal+'% · 목표 -14 LUFS · EQ 유사 프리셋 '+PRESET_LABELS[nearestKey], 'ok');
 
       $('btnProcess').disabled = false;
       processAudio();
