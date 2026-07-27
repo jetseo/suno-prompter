@@ -321,6 +321,7 @@
       <div class="rowVal" id="jitterAmtVal">0%</div>
     </div>
     <div class="smartHint" style="display:block; margin-top:12px;">✦ 완전한 보컬 분리가 아닌, 보컬이 주로 위치하는 중역대(250Hz~4kHz)에만 적용됩니다. 베이스·킥·심벌 등은 거의 영향받지 않습니다.</div>
+    <div class="smartHint" id="satJitterHint" style="display:none; margin-top:8px;"></div>
     <div class="row" style="margin-top:14px;">
       <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
         <input type="checkbox" id="stemSeparate" style="width:auto;">
@@ -497,6 +498,13 @@
       b0 = (1+cosw0)/2;
       b1 = -(1+cosw0);
       b2 = (1+cosw0)/2;
+      a0 = 1+alpha;
+      a1 = -2*cosw0;
+      a2 = 1-alpha;
+    } else if(type === 'lowpass'){
+      b0 = (1-cosw0)/2;
+      b1 =  1-cosw0;
+      b2 = (1-cosw0)/2;
       a0 = 1+alpha;
       a1 = -2*cosw0;
       a2 = 1-alpha;
@@ -877,6 +885,7 @@
     $('satAmtVal').textContent = p.sat+'%';
     $('jitterAmt').value = p.jitter;
     $('jitterAmtVal').textContent = p.jitter+'%';
+    updateSatJitterHint();
   }
 
   $('presetSelect').addEventListener('change', (e)=> applyPreset(e.target.value));
@@ -914,14 +923,26 @@
     $('widthAmtVal').textContent = e.target.value+'%';
     $('presetSelect').value = 'custom';
   });
+  function updateSatJitterHint(){
+    const on = parseFloat($('satAmt').value)>0 || parseFloat($('jitterAmt').value)>0;
+    const hint = $('satJitterHint');
+    if(!on){ hint.style.display = 'none'; return; }
+    hint.style.display = 'block';
+    hint.textContent = $('stemSeparate').checked
+      ? '✦ 실제 AI 스템 분리가 켜져 있어요 — 보컬을 진짜로 분리해서 처리하니 잡음 없이 가장 깨끗합니다.'
+      : '✦ 권장: 아래 "실제 AI 스템 분리"를 함께 켜면 대역 제한 근사 방식보다 훨씬 깨끗하게 처리됩니다 (다운로드/처리 시간은 늘어남).';
+  }
   $('satAmt').addEventListener('input', (e)=>{
     $('satAmtVal').textContent = e.target.value+'%';
     $('presetSelect').value = 'custom';
+    updateSatJitterHint();
   });
   $('jitterAmt').addEventListener('input', (e)=>{
     $('jitterAmtVal').textContent = e.target.value+'%';
     $('presetSelect').value = 'custom';
+    updateSatJitterHint();
   });
+  $('stemSeparate').addEventListener('change', updateSatJitterHint);
   $('targetLufs').addEventListener('input', (e)=>{
     $('targetLufsVal').textContent = e.target.value+' LUFS';
   });
@@ -964,6 +985,7 @@
     $('ceiling').value = p.ceiling; $('ceilingVal').textContent = parseFloat(p.ceiling).toFixed(1)+' dB';
     $('presetSelect').value = 'custom';
     $('eqHint').style.display = 'none';
+    updateSatJitterHint();
   }
   function refreshUserPresetSelect(){
     const presets = loadUserPresets();
@@ -1616,14 +1638,31 @@
     }
     return out;
   }
-  function vocalSaturateJitter(data, fs, driveAmt, jitterAmt, sharedNoise){
-    if(driveAmt<=0 && jitterAmt<=0) return data;
-    const bandLow = runBiquad(makeBiquad('highpass', fs, 250, 0, 0.707), data.slice());
-    const aboveHi = runBiquad(makeBiquad('highpass', fs, 4000, 0, 0.707), data.slice());
-    const vocalBand = new Float32Array(data.length);
-    for(let i=0;i<data.length;i++) vocalBand[i] = bandLow[i]-aboveHi[i];
+  // Linkwitz-Riley 4th-order split: cascading two identical Butterworth
+  // (Q=1/sqrt(2)) biquads of the same type/cutoff gives an LR4 filter, and an
+  // LR4 lowpass+highpass pair at the same cutoff sums back to the original
+  // signal almost exactly (the standard property behind speaker crossovers) —
+  // unlike a single gentle highpass difference, which leaves real energy
+  // overlap right at the crossover.
+  function lr4(data, fs, type, freq){
+    return runBiquad(makeBiquad(type, fs, freq, 0, Math.SQRT1_2),
+      runBiquad(makeBiquad(type, fs, freq, 0, Math.SQRT1_2), data.slice()));
+  }
+  function bandSplitLR4(data, fs){
+    // Define residual as data-vocalBand (not an independently-filtered low+high)
+    // so the unshifted baseline reconstruction is exact, same as before — only
+    // vocalBand itself is extracted more tightly (steeper LR4 bandpass instead
+    // of a gentle highpass difference), so less out-of-band content ends up
+    // inside the part that gets time-shifted by jitter.
+    const rest = lr4(data, fs, 'highpass', 250);
+    const vocalBand = lr4(rest, fs, 'lowpass', 4000);
     const residual = new Float32Array(data.length);
     for(let i=0;i<data.length;i++) residual[i] = data[i]-vocalBand[i];
+    return { vocalBand, residual };
+  }
+  function vocalSaturateJitter(data, fs, driveAmt, jitterAmt, sharedNoise){
+    if(driveAmt<=0 && jitterAmt<=0) return data;
+    const { vocalBand, residual } = bandSplitLR4(data, fs);
 
     let processed = vocalBand;
     if(driveAmt>0){
