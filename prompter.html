@@ -125,9 +125,14 @@
       .header{flex-wrap:wrap;padding:12px 14px;}
       .header-actions{flex-wrap:wrap;row-gap:8px;}
       .tab-strip{padding:8px 12px;}
-      .main{display:block;overflow:visible;}
+      /* Selections stay first, but the generated prompt (right panel) moves
+         up to sit right after them — otherwise on mobile it lands below the
+         summary panel, far off-screen from where the user is tapping. */
+      .main{display:flex;flex-direction:column;overflow:visible;}
       .panel{overflow-y:visible;max-height:none;}
-      .left-panel,.mid-panel{border-right:none;border-bottom:1px solid var(--border);}
+      .left-panel{order:1;border-right:none;border-bottom:1px solid var(--border);}
+      .right-panel{order:2;border-bottom:1px solid var(--border);}
+      .mid-panel{order:3;border-right:none;}
     }
     @media (max-width: 480px){
       .logo-sub{display:none;}

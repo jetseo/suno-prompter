@@ -730,9 +730,30 @@
     waveCtx.fill();
   }
 
-  // Draws original (gray) and processed (amber) waveforms overlaid on the
-  // same axis so the ear-level difference between them is visible at a
-  // glance, or — in diff mode — the sample-wise delta amplified for clarity.
+  // Traces the min/max envelope as a stroked outline (not filled) — used to
+  // draw the original waveform ON TOP of the mastered fill so any point
+  // where they diverge sticks out as a visible line poking above/below the
+  // fill, instead of two translucent fills blending into one blob.
+  function drawOutline(cols, w, h, mid, strokeColor, lineWidth){
+    waveCtx.strokeStyle = strokeColor;
+    waveCtx.lineWidth = lineWidth;
+    waveCtx.beginPath();
+    for(let x=0;x<w;x++){
+      const y = mid + cols[x].max*mid*0.9;
+      if(x===0) waveCtx.moveTo(x,y); else waveCtx.lineTo(x,y);
+    }
+    waveCtx.stroke();
+    waveCtx.beginPath();
+    for(let x=0;x<w;x++){
+      const y = mid + cols[x].min*mid*0.9;
+      if(x===0) waveCtx.moveTo(x,y); else waveCtx.lineTo(x,y);
+    }
+    waveCtx.stroke();
+  }
+
+  // Draws original vs. processed waveforms on the same axis so the actual
+  // difference is visible at a glance, or — in diff mode — the sample-wise
+  // delta amplified for clarity.
   function drawWaveformCompare(origData, procData, mode){
     const w = waveCanvas.width, h = waveCanvas.height;
     waveCtx.clearRect(0,0,w,h);
@@ -759,18 +780,31 @@
       drawEnvelope(computeColumns(diff, w), w, h, mid, 'rgba(229,72,77,0.8)');
       return;
     }
-    if(origData) drawEnvelope(computeColumns(origData, w), w, h, mid, 'rgba(107,114,128,0.55)');
-    if(procData) drawEnvelope(computeColumns(procData, w), w, h, mid, 'rgba(232,163,61,0.65)');
+
+    if(origData && procData){
+      // fill = mastered (base), outline = original (traced on top) — a
+      // filled-vs-filled overlay blends into one color at a glance, but a
+      // stroked line always stands out against the fill wherever it pokes
+      // outside or dips inside it.
+      drawEnvelope(computeColumns(procData, w), w, h, mid, 'rgba(232,163,61,0.55)');
+      drawOutline(computeColumns(origData, w), w, h, mid, 'rgba(226,232,240,0.9)', 1.25);
+    } else if(procData){
+      drawEnvelope(computeColumns(procData, w), w, h, mid, 'rgba(232,163,61,0.65)');
+    } else if(origData){
+      drawEnvelope(computeColumns(origData, w), w, h, mid, 'rgba(107,114,128,0.55)');
+    }
   }
 
   function updateWaveLegend(){
     const el = $('waveLegend');
     if(state.waveMode==='diff'){
       el.innerHTML = '<span class="legendItem"><span class="swatch" style="background:rgba(229,72,77,0.9)"></span>차이 파형 (원본 대비, 약 '+lastDiffScale.toFixed(1)+'배 확대해 표시)</span>';
-    } else {
+    } else if(state.processedChannels){
       el.innerHTML =
-        '<span class="legendItem"><span class="swatch" style="background:rgba(107,114,128,0.9)"></span>원본 (A)</span>'+
-        '<span class="legendItem"><span class="swatch" style="background:rgba(232,163,61,0.9)"></span>마스터링 (B)</span>';
+        '<span class="legendItem"><span class="swatch" style="background:rgba(226,232,240,0.9);border:1px solid rgba(226,232,240,0.9);"></span>원본 (윤곽선)</span>'+
+        '<span class="legendItem"><span class="swatch" style="background:rgba(232,163,61,0.9)"></span>마스터링 (채우기)</span>';
+    } else {
+      el.innerHTML = '<span class="legendItem"><span class="swatch" style="background:rgba(107,114,128,0.9)"></span>원본</span>';
     }
   }
 
@@ -1155,6 +1189,21 @@
     return { hfRatio, lowRatio, correlation };
   }
 
+  // Average energy above `freq`, expressed in dB — used to log measured
+  // before/after effect of a stage rather than just the setting that was applied.
+  function bandEnergyDb(mono, fs, freq){
+    const hp = makeBiquad('highpass', fs, freq, 0, 0.707);
+    const out = runBiquad(hp, mono.slice());
+    let e=0; for(let i=0;i<out.length;i++) e+=out[i]*out[i];
+    return 10*Math.log10(e/out.length + 1e-12);
+  }
+  function stereoCorrelation(L, R){
+    let sumLR=0, sumLL=0, sumRR=0;
+    for(let i=0;i<L.length;i++){ sumLR+=L[i]*R[i]; sumLL+=L[i]*L[i]; sumRR+=R[i]*R[i]; }
+    const denom = Math.sqrt(sumLL*sumRR);
+    return denom>0 ? sumLR/denom : 1;
+  }
+
   // ================= Smart EQ: per-band spectral balance analysis =================
   // Splits the track into the same 7 bands as the EQ (via successive highpass
   // energy subtraction), then nudges outlier bands toward the track's own
@@ -1213,6 +1262,8 @@
     const aiDenoiseAmt = parseFloat($('aiDenoiseAmt').value)/100;
     if(aiDenoiseAmt > 0){
       setProgress(2, 'AI 아티팩트 제거 중...');
+      const monoBefore = channels.length>1 ? channels[0].map((v,i)=>(v+channels[1][i])*0.5) : channels[0];
+      const hfBeforeDb = bandEnergyDb(monoBefore, fs, 5000);
       const denoised = [];
       for(let c=0;c<channels.length;c++){
         denoised.push(await spectralAIDenoise(channels[c], fs, aiDenoiseAmt, (f)=>{
@@ -1221,7 +1272,9 @@
         }));
       }
       channels = denoised;
-      log('AI 아티팩트 제거 적용 ('+Math.round(aiDenoiseAmt*100)+'%) — 스펙트럴 스파이크 감쇠');
+      const monoAfter = channels.length>1 ? channels[0].map((v,i)=>(v+channels[1][i])*0.5) : channels[0];
+      const hfAfterDb = bandEnergyDb(monoAfter, fs, 5000);
+      log('[02] AI 아티팩트 제거 적용 ('+Math.round(aiDenoiseAmt*100)+'%) — 5kHz+ 대역 에너지 '+hfBeforeDb.toFixed(1)+' → '+hfAfterDb.toFixed(1)+'dB ('+(hfAfterDb-hfBeforeDb>=0?'+':'')+(hfAfterDb-hfBeforeDb).toFixed(1)+'dB)');
     } else {
       setProgress(60);
     }
@@ -1238,7 +1291,7 @@
         out = runBiquad(c2, out);
         return out;
       });
-      log('고역 노이즈 억제 적용 ('+Math.round(noiseAmt*100)+'%)');
+      log('[02] 고역 노이즈 억제 적용 ('+Math.round(noiseAmt*100)+'%) — 10.5kHz '+peakCutDb.toFixed(1)+'dB, 13kHz+ shelf '+shelfCutDb.toFixed(1)+'dB');
     }
     setProgress(65, 'EQ / 스테레오 폭 처리 중...');
 
@@ -1257,12 +1310,14 @@
         }
         return out;
       });
-      log('EQ 적용: '+eqGains.map((g,i)=>eqFreqs[i]+'Hz '+(g>0?'+':'')+g+'dB').join(', '));
+      const changedBands = eqGains.map((g,i)=>({g,i})).filter(x=>x.g!==0);
+      log('[03] EQ 적용: '+changedBands.length+'개 밴드 조정 — '+changedBands.map(x=>eqFreqs[x.i]+'Hz '+(x.g>0?'+':'')+x.g+'dB').join(', '));
     }
 
     // 3) Stereo width (mid-side)
     const widthPct = parseFloat($('widthAmt').value)/100;
     if(numCh>=2 && widthPct !== 1){
+      const corrBefore = stereoCorrelation(channels[0], channels[1]);
       const L = channels[0], R = channels[1];
       const newL = new Float32Array(L.length);
       const newR = new Float32Array(R.length);
@@ -1273,7 +1328,8 @@
         newR[i] = mid-side;
       }
       channels[0]=newL; channels[1]=newR;
-      log('스테레오 폭 조절: '+Math.round(widthPct*100)+'%');
+      const corrAfter = stereoCorrelation(newL, newR);
+      log('[04] 스테레오 폭 조절: 100% → '+Math.round(widthPct*100)+'% (좌우 상관도 '+corrBefore.toFixed(2)+' → '+corrAfter.toFixed(2)+')');
     }
     setProgress(72, '음압 보정 중...');
 
@@ -1285,7 +1341,7 @@
     for(const ch of channels){
       for(let i=0;i<ch.length;i++) ch[i] *= gainLin;
     }
-    log('음압 보정: '+measuredLufs.toFixed(1)+' → '+targetLufs+' LUFS ('+(gainDb>0?'+':'')+gainDb.toFixed(1)+'dB 게인)');
+    log('[05] 음압 보정: '+measuredLufs.toFixed(1)+' → '+targetLufs+' LUFS ('+(gainDb>0?'+':'')+gainDb.toFixed(1)+'dB 게인)');
 
     // 5) Sample-peak safety limiter (lookahead brickwall)
     setProgress(78, '리미터 처리 중...');
@@ -1317,8 +1373,12 @@
           gainEnv[i] = Math.min(gainEnv[i], gainEnv[i-1]+maxStep);
         }
       }
+      let minGain = 1;
+      for(let i=0;i<n;i++) if(gainEnv[i]<minGain) minGain=gainEnv[i];
       for(const ch of channels) for(let i=0;i<n;i++) ch[i] *= gainEnv[i];
-      log('리미터 작동: 샘플 피크를 '+ceilingDb.toFixed(1)+'dB 이하로 제한', 'warn');
+      const peakBeforeDb = 20*Math.log10(peakAfter+1e-12);
+      const reductionDb = 20*Math.log10(minGain+1e-12);
+      log('[05] 리미터 작동: 피크 '+peakBeforeDb.toFixed(1)+'dBFS → 천장 '+ceilingDb.toFixed(1)+'dB 이하 (최대 '+reductionDb.toFixed(1)+'dB 게인 리덕션)', 'warn');
     }
 
     // 6) True-peak (dBTP) verification — sample-peak limiting alone can leave
@@ -1332,8 +1392,9 @@
       const extraGainDb = ceilingDb - truePeakDb - 0.1; // small extra margin
       const extraGainLin = Math.pow(10, extraGainDb/20);
       for(const ch of channels) for(let i=0;i<ch.length;i++) ch[i] *= extraGainLin;
-      log('트루피크 보정: 인터샘플 오버 감지 · 추가 '+extraGainDb.toFixed(1)+'dB 트림', 'warn');
-      truePeakDb += extraGainDb;
+      const newTruePeakDb = truePeakDb + extraGainDb;
+      log('[05] 트루피크 보정: '+truePeakDb.toFixed(1)+' → '+newTruePeakDb.toFixed(1)+'dBTP (인터샘플 오버 감지, 추가 '+extraGainDb.toFixed(1)+'dB 트림)', 'warn');
+      truePeakDb = newTruePeakDb;
     }
     setProgress(97, '마무리 중...');
 
@@ -1345,7 +1406,7 @@
     updateLufsDisplay('proc', finalLufs);
     drawVU(finalLufs);
     refreshWaveform();
-    log('마스터링 완료 · 최종 '+finalLufs.toFixed(1)+' LUFS, 트루피크 '+truePeakDb.toFixed(1)+' dBTP', 'ok');
+    log('마스터링 완료 · LUFS '+state.origLufsVal.toFixed(1)+' → '+finalLufs.toFixed(1)+', 트루피크 '+state.peakDb.toFixed(1)+' → '+truePeakDb.toFixed(1)+' dBTP', 'ok');
 
     $('btnExport').disabled = false;
     $('btnExportMp3').disabled = false;
