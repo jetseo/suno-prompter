@@ -311,6 +311,15 @@
   <div class="module">
     <h2><span class="num">03</span>보컬 새츄레이션 &amp; 지터 (AI 티 줄이기)</h2>
     <div class="row">
+      <label>빠른 강도 선택<span class="sub">EQ 프리셋과 무관하게 새츄레이션/지터 강도만 바로 적용</span></label>
+      <div class="abToggle" id="satJitterQuick" style="width:100%;">
+        <button type="button" class="satJitterQuickBtn active" data-sat="0" data-jitter="0" style="flex:1;">없음</button>
+        <button type="button" class="satJitterQuickBtn" data-sat="8" data-jitter="5" style="flex:1;">약하게</button>
+        <button type="button" class="satJitterQuickBtn" data-sat="15" data-jitter="10" style="flex:1;">보통</button>
+        <button type="button" class="satJitterQuickBtn" data-sat="25" data-jitter="18" style="flex:1;">강하게</button>
+      </div>
+    </div>
+    <div class="row">
       <label>새츄레이션<span class="sub">아날로그 테이프/진공관 질감의 배음 추가</span></label>
       <input type="range" id="satAmt" min="0" max="100" value="0">
       <div class="rowVal" id="satAmtVal">0%</div>
@@ -885,6 +894,7 @@
     $('satAmtVal').textContent = p.sat+'%';
     $('jitterAmt').value = p.jitter;
     $('jitterAmtVal').textContent = p.jitter+'%';
+    updateSatJitterQuickActive();
     updateSatJitterHint();
   }
 
@@ -932,14 +942,34 @@
       ? '✦ 실제 AI 스템 분리가 켜져 있어요 — 보컬을 진짜로 분리해서 처리하니 잡음 없이 가장 깨끗합니다.'
       : '✦ 권장: 아래 "실제 AI 스템 분리"를 함께 켜면 대역 제한 근사 방식보다 훨씬 깨끗하게 처리됩니다 (다운로드/처리 시간은 늘어남).';
   }
+  // Highlights whichever quick-preset button matches the current slider values
+  // (or none, if the user has since fine-tuned away from a preset step).
+  function updateSatJitterQuickActive(){
+    const sat = parseFloat($('satAmt').value), jitter = parseFloat($('jitterAmt').value);
+    document.querySelectorAll('.satJitterQuickBtn').forEach(btn=>{
+      const match = parseFloat(btn.dataset.sat)===sat && parseFloat(btn.dataset.jitter)===jitter;
+      btn.classList.toggle('active', match);
+    });
+  }
+  document.querySelectorAll('.satJitterQuickBtn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const sat = btn.dataset.sat, jitter = btn.dataset.jitter;
+      $('satAmt').value = sat; $('satAmtVal').textContent = sat+'%';
+      $('jitterAmt').value = jitter; $('jitterAmtVal').textContent = jitter+'%';
+      updateSatJitterQuickActive();
+      updateSatJitterHint();
+    });
+  });
   $('satAmt').addEventListener('input', (e)=>{
     $('satAmtVal').textContent = e.target.value+'%';
     $('presetSelect').value = 'custom';
+    updateSatJitterQuickActive();
     updateSatJitterHint();
   });
   $('jitterAmt').addEventListener('input', (e)=>{
     $('jitterAmtVal').textContent = e.target.value+'%';
     $('presetSelect').value = 'custom';
+    updateSatJitterQuickActive();
     updateSatJitterHint();
   });
   $('stemSeparate').addEventListener('change', updateSatJitterHint);
@@ -985,6 +1015,7 @@
     $('ceiling').value = p.ceiling; $('ceilingVal').textContent = parseFloat(p.ceiling).toFixed(1)+' dB';
     $('presetSelect').value = 'custom';
     $('eqHint').style.display = 'none';
+    updateSatJitterQuickActive();
     updateSatJitterHint();
   }
   function refreshUserPresetSelect(){
