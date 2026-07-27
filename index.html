@@ -1211,10 +1211,21 @@
     bluesteinCache[N] = plan;
     return plan;
   }
-  // in-place-ish: xRe/xIm (length N) -> returns [outRe, outIm] (length N)
+  // in-place-ish: xRe/xIm (length N) -> returns [outRe, outIm] (length N).
+  // Scratch buffers are allocated once per plan and reused across calls (this runs
+  // ~1000+ times per audio chunk during stem separation, so allocating six fresh
+  // ~131KB Float64Arrays every call was a meaningful chunk of the total GC churn).
+  // Safe because calls are always sequential and each caller consumes the returned
+  // arrays immediately before the next call on the same plan.
   function bluesteinTransform(plan, xRe, xIm, inverse){
     const {N,M,wRe,wIm,Bre,Bim} = plan;
-    const aRe = new Float64Array(M), aIm = new Float64Array(M);
+    if(!plan._aRe){
+      plan._aRe = new Float64Array(M); plan._aIm = new Float64Array(M);
+      plan._cRe = new Float64Array(M); plan._cIm = new Float64Array(M);
+      plan._outRe = new Float64Array(N); plan._outIm = new Float64Array(N);
+    }
+    const aRe = plan._aRe, aIm = plan._aIm;
+    aRe.fill(0); aIm.fill(0); // tail [N,M) must stay zero; cheaper to clear the whole thing than slice-fill
     const sign = inverse ? 1 : -1;
     for(let n=0;n<N;n++){
       const wr = wRe[n], wi = sign>0 ? -wIm[n] : wIm[n];
@@ -1222,14 +1233,14 @@
       aIm[n] = xRe[n]*wi + xIm[n]*wr;
     }
     fftInPlace(aRe, aIm, false);
-    const cRe = new Float64Array(M), cIm = new Float64Array(M);
+    const cRe = plan._cRe, cIm = plan._cIm;
     for(let i=0;i<M;i++){
       const br = Bre[i], bi = inverse ? -Bim[i] : Bim[i];
       cRe[i] = aRe[i]*br - aIm[i]*bi;
       cIm[i] = aRe[i]*bi + aIm[i]*br;
     }
     fftInPlace(cRe, cIm, true);
-    const outRe = new Float64Array(N), outIm = new Float64Array(N);
+    const outRe = plan._outRe, outIm = plan._outIm;
     for(let k=0;k<N;k++){
       const wr = wRe[k], wi = inverse ? -wIm[k] : wIm[k];
       outRe[k] = cRe[k]*wr - cIm[k]*wi;
@@ -1261,8 +1272,11 @@
     for(let i=0;i<padRight;i++) out[padLeft + n + i] = x[n - 2 - i];
     return out;
   }
-  // STFT of one channel -> {re,im}: arrays of MDX_DIM_F Float32Arrays (each length numFrames), cropped/zeroed per model contract
-  function mdxStftChannel(x){
+  // STFT of one channel -> {re,im}: arrays of MDX_DIM_F Float32Arrays (each length numFrames), cropped/zeroed per model contract.
+  // Async + yields every 16 frames: this loop runs 256 Bluestein transforms per channel and was
+  // found to dominate per-chunk processing time (more than the ONNX inference call itself), long
+  // enough to freeze the tab and leave the progress bar stuck without these yield points.
+  async function mdxStftChannel(x, onProgress){
     const plan = getBluesteinPlan(MDX_N_FFT);
     const window = mdxHannWindow();
     const padded = reflectPad(x, MDX_N_FFT/2, MDX_N_FFT/2);
@@ -1279,11 +1293,16 @@
         re[f][t] = f<3 ? 0 : Xre[f];
         im[f][t] = f<3 ? 0 : Xim[f];
       }
+      if(t % 16 === 0){
+        if(onProgress) onProgress(t/numFrames);
+        await yieldUI();
+      }
     }
+    if(onProgress) onProgress(1);
     return { re, im, numFrames };
   }
   // Inverse STFT: re,im are MDX_DIM_F x numFrames -> real waveform, length (numFrames-1)*hop+n_fft, UNTRIMMED
-  function mdxIstftChannelRaw(re, im, numFrames){
+  async function mdxIstftChannelRaw(re, im, numFrames, onProgress){
     const plan = getBluesteinPlan(MDX_N_FFT);
     const window = mdxHannWindow();
     const outLen = (numFrames-1)*MDX_HOP + MDX_N_FFT;
@@ -1305,13 +1324,18 @@
         overlapBuf[start+i] += xre[i]*wv;
         windowSumSq[start+i] += wv*wv;
       }
+      if(t % 16 === 0){
+        if(onProgress) onProgress(t/numFrames);
+        await yieldUI();
+      }
     }
     const out = new Float32Array(outLen);
     for(let i=0;i<outLen;i++) out[i] = windowSumSq[i]>1e-11 ? overlapBuf[i]/windowSumSq[i] : 0;
+    if(onProgress) onProgress(1);
     return out;
   }
-  function mdxIstftChannel(re, im, numFrames){
-    const raw = mdxIstftChannelRaw(re, im, numFrames);
+  async function mdxIstftChannel(re, im, numFrames, onProgress){
+    const raw = await mdxIstftChannelRaw(re, im, numFrames, onProgress);
     const trim = MDX_N_FFT/2;
     return raw.slice(trim, raw.length-trim); // torch.istft(center=True) trims n_fft/2 off each side
   }
@@ -1330,13 +1354,45 @@
     if(!window.ort) throw new Error('ONNX Runtime 로드 실패');
     ort.env.wasm.numThreads = 1;
   }
-  function ensureMdxSession(onStatus){
+  // Fetches a URL manually (instead of handing it to ORT to fetch internally) so we can
+  // report real byte-level download progress instead of the progress bar sitting frozen
+  // for however long the ~70MB runtime+model download takes.
+  async function fetchWithProgress(url, onBytes){
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('다운로드 실패: '+url+' ('+res.status+')');
+    const reader = res.body.getReader();
+    const chunks = [];
+    let received = 0;
+    while(true){
+      const { done, value } = await reader.read();
+      if(done) break;
+      chunks.push(value);
+      received += value.length;
+      if(onBytes) onBytes(received);
+    }
+    const buf = new Uint8Array(received);
+    let offset = 0;
+    for(const c of chunks){ buf.set(c, offset); offset += c.length; }
+    return buf;
+  }
+  // Approximate byte sizes, used only to weight the combined download progress bar.
+  const MDX_WASM_BYTES_APPROX = 11018731, MDX_MODEL_BYTES_APPROX = 59074342;
+  function ensureMdxSession(onProgress){ // onProgress(fraction 0..1, label)
     if(!mdxSessionPromise){
       mdxSessionPromise = (async ()=>{
-        if(onStatus) onStatus('AI 모델 런타임 불러오는 중...');
         await ensureOrtLoaded();
-        if(onStatus) onStatus('스템 분리 모델(약 57MB) 다운로드 중... (최초 1회만)');
-        return await ort.InferenceSession.create('models/UVR-MDX-NET-Inst_HQ_5.onnx', { executionProviders: ['wasm'] });
+        const totalBytes = MDX_WASM_BYTES_APPROX + MDX_MODEL_BYTES_APPROX;
+        if(!ort.env.wasm.wasmBinary){
+          const wasmBuf = await fetchWithProgress('vendor/ort/ort-wasm-simd-threaded.wasm', (got)=>{
+            if(onProgress) onProgress(got/totalBytes, 'AI 모델 런타임 다운로드 중... '+(got/1e6).toFixed(1)+'MB/'+(MDX_WASM_BYTES_APPROX/1e6).toFixed(1)+'MB');
+          });
+          ort.env.wasm.wasmBinary = wasmBuf;
+        }
+        const modelBuf = await fetchWithProgress('models/UVR-MDX-NET-Inst_HQ_5.onnx', (got)=>{
+          const overallGot = MDX_WASM_BYTES_APPROX + got;
+          if(onProgress) onProgress(overallGot/totalBytes, '스템 분리 모델 다운로드 중... '+(overallGot/1e6).toFixed(1)+'MB/'+(totalBytes/1e6).toFixed(1)+'MB (최초 1회만)');
+        });
+        return await ort.InferenceSession.create(modelBuf, { executionProviders: ['wasm'] });
       })().catch(err=>{ mdxSessionPromise = null; throw err; }); // allow retry on next call after a failure
     }
     return mdxSessionPromise;
@@ -1362,9 +1418,13 @@
   }
 
   // Runs one fixed-size (chunkSize-sample) stereo chunk through STFT -> ONNX model -> ISTFT.
-  async function runMdxChunk(session, Lchunk, Rchunk){
-    const stftL = mdxStftChannel(Lchunk);
-    const stftR = mdxStftChannel(Rchunk);
+  // onProgress(0..1) reports real progress through this chunk: STFT (L then R) covers 0-40%,
+  // the opaque ONNX inference call covers 40-60% (no sub-progress possible — it's a single
+  // black-box WASM call), ISTFT (L then R) covers 60-100%.
+  async function runMdxChunk(session, Lchunk, Rchunk, onProgress){
+    const report = (phaseStart, phaseWeight, frac)=>{ if(onProgress) onProgress(phaseStart + frac*phaseWeight); };
+    const stftL = await mdxStftChannel(Lchunk, f => report(0, 0.2, f));
+    const stftR = await mdxStftChannel(Rchunk, f => report(0.2, 0.2, f));
     const total = 4*MDX_DIM_F*MDX_DIM_T;
     const inputData = new Float32Array(total);
     function writeCh(chIdx, arr2d){
@@ -1376,7 +1436,9 @@
     }
     writeCh(0, stftL.re); writeCh(1, stftL.im); writeCh(2, stftR.re); writeCh(3, stftR.im);
     const inputTensor = new ort.Tensor('float32', inputData, [1,4,MDX_DIM_F,MDX_DIM_T]);
+    if(onProgress) onProgress(0.4);
     const results = await session.run({ input: inputTensor });
+    if(onProgress) onProgress(0.6);
     const outData = results[session.outputNames[0]].data;
     function extractOutCh(chIdx){
       const arr2d = new Array(MDX_DIM_F);
@@ -1389,8 +1451,8 @@
       }
       return arr2d;
     }
-    const outL = mdxIstftChannel(extractOutCh(0), extractOutCh(1), MDX_DIM_T);
-    const outR = mdxIstftChannel(extractOutCh(2), extractOutCh(3), MDX_DIM_T);
+    const outL = await mdxIstftChannel(extractOutCh(0), extractOutCh(1), MDX_DIM_T, f => report(0.6, 0.2, f));
+    const outR = await mdxIstftChannel(extractOutCh(2), extractOutCh(3), MDX_DIM_T, f => report(0.8, 0.2, f));
     return { L: outL, R: outR };
   }
 
@@ -1418,7 +1480,13 @@
     const divider = new Float32Array(mixLen);
     const totalChunks = Math.ceil(mixLen/step);
 
-    const session = await ensureMdxSession(msg => onProgress && onProgress(0, msg));
+    // The one-time runtime+model download gets a fixed share of the overall progress bar;
+    // the rest is spent moving through chunks. Within a chunk, runMdxChunk reports real
+    // progress through its STFT/inference/ISTFT phases (see its own comment for the split).
+    const DOWNLOAD_WEIGHT = 0.15;
+    const session = await ensureMdxSession((frac, label)=>{
+      if(onProgress) onProgress(frac*DOWNLOAD_WEIGHT, label);
+    });
 
     let chunkIdx = 0;
     for(let i=0; i<mixLen; i+=step){
@@ -1433,8 +1501,11 @@
         Lp.set(Lc); Rp.set(Rc);
         Lc = Lp; Rc = Rp;
       }
-      if(onProgress) onProgress(chunkIdx/totalChunks, '🧬 AI 스템 분리 중... 청크 '+chunkIdx+'/'+totalChunks);
-      const out = await runMdxChunk(session, Lc, Rc);
+      const chunkStartFrac = (chunkIdx-1)/totalChunks;
+      const label = '🧬 AI 스템 분리 중... 청크 '+chunkIdx+'/'+totalChunks;
+      const out = await runMdxChunk(session, Lc, Rc, (subFrac)=>{
+        if(onProgress) onProgress(DOWNLOAD_WEIGHT + (chunkStartFrac + subFrac/totalChunks)*(1-DOWNLOAD_WEIGHT), label);
+      });
       for(let k=0;k<chunkActual;k++){
         const w = window[k];
         resultL[start+k] += out.L[k]*w;
