@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Suno Master — 수노 AI 전용 마스터링 툴</title>
+<script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.0/lame.min.js" defer></script>
 <style>
   @font-face {
     font-family: 'Pretendard';
@@ -155,22 +156,46 @@
     border-radius:6px; padding:9px 10px; font-size:13.5px; margin-bottom:14px;
     font-family:'Pretendard',sans-serif;
   }
+  .smartHint{
+    font-size:11.5px; color:var(--teal); margin-bottom:12px; padding:8px 11px;
+    background:rgba(95,211,196,0.08); border:1px solid rgba(95,211,196,0.25); border-radius:7px;
+  }
 
-  /* ---------- Waveform ---------- */
+  /* ---------- User presets ---------- */
+  .userPresetInput{
+    flex:1; background: var(--panel); color:var(--text); border:1px solid var(--line);
+    border-radius:6px; padding:9px 10px; font-size:12.5px; outline:none;
+    font-family:'Pretendard',sans-serif;
+  }
+  .userPresetInput:focus{ border-color:var(--amber); }
+  select#userPresetSelect{
+    flex:1; background: var(--panel); color:var(--text); border:1px solid var(--line);
+    border-radius:6px; padding:9px 10px; font-size:12.5px; font-family:'Pretendard',sans-serif;
+  }
+
+  /* ---------- Waveform / spectrum ---------- */
   #waveCanvas{ width:100%; height:80px; display:block; border-radius:6px; background:#101215; }
+  #specCanvas{ width:100%; height:64px; display:block; border-radius:6px; background:#101215; margin-top:8px; }
+  .specLabel{ font-size:10.5px; color:var(--text-dim); margin-top:6px; font-family:var(--mono); }
+
+  /* ---------- Progress bar ---------- */
+  .progressWrap{ height:6px; background:var(--line); border-radius:3px; overflow:hidden; margin-top:12px; }
+  .progressBar{ height:100%; width:0%; background:var(--amber); transition:width .12s linear; }
+  .progressLabel{ font-family:var(--mono); font-size:11px; color:var(--text-dim); margin-top:6px; }
 
   /* ---------- Transport ---------- */
   .transport{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-  button{
+  button, a.btnlike{
     font-family:'Pretendard',sans-serif; font-size:13.5px; font-weight:600;
     border-radius:7px; padding:11px 18px; cursor:pointer; border:1px solid var(--line);
     background: var(--panel-2); color: var(--text); transition: all .12s;
+    display:inline-block; text-decoration:none;
   }
-  button:hover:not(:disabled){ border-color: var(--amber); }
+  button:hover:not(:disabled), a.btnlike:hover{ border-color: var(--amber); }
   button:disabled{ opacity:0.35; cursor:not-allowed; }
   button.primary{ background: var(--amber); color:#1a1300; border-color: var(--amber); }
   button.primary:hover:not(:disabled){ background:#f0b158; }
-  button.ghost{ background:transparent; }
+  button.ghost, a.btnlike.ghost{ background:transparent; }
   .abToggle{ display:flex; border:1px solid var(--line); border-radius:7px; overflow:hidden; }
   .abToggle button{ border:none; border-radius:0; }
   .abToggle button.active{ background: var(--teal); color:#0b1f1c; }
@@ -251,13 +276,15 @@
           <div class="value dim" id="procLufs">—</div>
         </div>
         <div class="lufsBox">
-          <div class="label">피크</div>
+          <div class="label">피크 (TP)</div>
           <div class="value dim" id="peakVal">—</div>
         </div>
       </div>
     </div>
 
     <button id="btnAutoMaster" class="primary" disabled style="width:100%; margin-top:16px; padding:14px; font-size:14.5px;">🎯 원클릭 자동 마스터링 — 분석 후 전체 세팅 자동 적용</button>
+    <div class="progressWrap" id="progressWrap" style="display:none;"><div class="progressBar" id="progressBar"></div></div>
+    <div class="progressLabel" id="progressLabel"></div>
     <div class="statusLog" id="statusLog">대기 중 · 음원 파일을 업로드하면 자동으로 분석을 시작합니다.</div>
   </div>
 
@@ -279,6 +306,8 @@
   <!-- 3. Character 프리셋 & EQ -->
   <div class="module">
     <h2><span class="num">03</span>음색 성향(Character) &amp; 7밴드 EQ</h2>
+    <button id="btnSmartEq" class="ghost" disabled style="width:100%; margin-bottom:12px;">🧠 스마트 EQ 추천 — 곡 스펙트럼 분석 후 밴드 자동 보정</button>
+    <div class="smartHint" id="eqHint" style="display:none;"></div>
     <select id="presetSelect">
       <option value="standard">Standard (기본 밸런스)</option>
       <option value="clean">Clean (명료한 고음, 뭉침 제거)</option>
@@ -296,6 +325,15 @@
       <div class="eqBand"><div class="freqLbl">H-Mid<br>2.5kHz</div><input type="range" class="eqSlider" data-band="4" min="-10" max="10" value="0"><div class="gainLbl" id="eqVal4">0dB</div></div>
       <div class="eqBand"><div class="freqLbl">Pres<br>6kHz</div><input type="range" class="eqSlider" data-band="5" min="-10" max="10" value="0"><div class="gainLbl" id="eqVal5">0dB</div></div>
       <div class="eqBand"><div class="freqLbl">Air<br>12kHz</div><input type="range" class="eqSlider" data-band="6" min="-10" max="10" value="0"><div class="gainLbl" id="eqVal6">0dB</div></div>
+    </div>
+    <div class="row" style="margin-top:16px;">
+      <input type="text" id="userPresetName" class="userPresetInput" placeholder="내 프리셋 이름 (예: 내 발라드 세팅)">
+      <button id="btnSavePreset" class="ghost">💾 현재 세팅 저장</button>
+    </div>
+    <div class="row" id="userPresetRow" style="display:none;">
+      <select id="userPresetSelect"></select>
+      <button id="btnLoadPreset">불러오기</button>
+      <button id="btnDeletePreset" class="ghost">삭제</button>
     </div>
   </div>
 
@@ -328,6 +366,8 @@
   <div class="module">
     <h2><span class="num">06</span>파형 비교 &amp; 저장</h2>
     <canvas id="waveCanvas" width="900" height="80"></canvas>
+    <canvas id="specCanvas" width="900" height="64"></canvas>
+    <div class="specLabel">실시간 스펙트럼 · 재생 중에만 표시됩니다</div>
     <div class="transport" style="margin-top:14px;">
       <div class="abToggle">
         <button id="btnA" class="active">A · 원본</button>
@@ -337,6 +377,8 @@
       <button id="btnPlay" disabled>▶ 재생</button>
       <button id="btnStop" disabled>■ 정지</button>
       <button id="btnExport" class="ghost" disabled>WAV로 저장</button>
+      <button id="btnExportMp3" class="ghost" disabled>MP3로 저장</button>
+      <a id="btnNewSong" href="prompter.html" class="btnlike ghost" style="display:none;">🎵 새 곡 만들러 가기</a>
     </div>
   </div>
 
@@ -369,6 +411,18 @@
     line.textContent = '· ' + msg;
     logEl.appendChild(line);
     logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  // ================= Progress bar / chunked-work helper =================
+  function yieldUI(){ return new Promise(r=>setTimeout(r,0)); }
+  function setProgress(pct, label){
+    $('progressWrap').style.display = 'block';
+    $('progressBar').style.width = Math.max(0,Math.min(100,pct)) + '%';
+    if(label!==undefined) $('progressLabel').textContent = label;
+  }
+  function hideProgress(){
+    $('progressWrap').style.display = 'none';
+    $('progressLabel').textContent = '';
   }
 
   function getAudioCtx(){
@@ -490,6 +544,79 @@
     return 20*Math.log10(peak+1e-12);
   }
 
+  // ================= True-peak (dBTP) via 4x polyphase oversampling =================
+  // Sample peak alone misses inter-sample overs that appear after D/A reconstruction.
+  // We approximate ITU-R BS.1770 true-peak by reconstructing the signal at 4x rate
+  // through a windowed-sinc lowpass and taking the max of the reconstructed points.
+  const TP_OVERSAMPLE = 4;
+  const TP_TAPS = 25;
+  let tpPolyphaseCache = null;
+  function designLowpassFIR(numTaps, cutoff){
+    const taps = new Float32Array(numTaps);
+    const M = numTaps-1;
+    for(let n=0;n<numTaps;n++){
+      const x = n - M/2;
+      const h = (x===0) ? cutoff : Math.sin(Math.PI*cutoff*x)/(Math.PI*x);
+      const w = 0.42 - 0.5*Math.cos(2*Math.PI*n/M) + 0.08*Math.cos(4*Math.PI*n/M); // Blackman window
+      taps[n] = h*w;
+    }
+    return taps;
+  }
+  function getTruePeakFilters(){
+    if(tpPolyphaseCache) return tpPolyphaseCache;
+    const h = designLowpassFIR(TP_TAPS, 1/TP_OVERSAMPLE);
+    let sum=0; for(let i=0;i<TP_TAPS;i++) sum+=h[i];
+    const scale = TP_OVERSAMPLE/sum; // restore DC gain lost to zero-stuffing
+    for(let i=0;i<TP_TAPS;i++) h[i]*=scale;
+    const sub = [];
+    for(let p=0;p<TP_OVERSAMPLE;p++){
+      const arr = [];
+      for(let t=0; p+TP_OVERSAMPLE*t < TP_TAPS; t++) arr.push(h[p+TP_OVERSAMPLE*t]);
+      sub.push(new Float32Array(arr));
+    }
+    tpPolyphaseCache = sub;
+    return sub;
+  }
+  // Synchronous true-peak (used for quick on-load metering)
+  function measureTruePeakDb(channels){
+    const sub = getTruePeakFilters();
+    let peak = 0;
+    for(const x of channels){
+      for(let p=0;p<sub.length;p++){
+        const g = sub[p], L = g.length;
+        for(let m=0;m<x.length;m++){
+          let acc=0;
+          for(let t=0;t<L;t++){ const idx=m-t; if(idx>=0) acc += g[t]*x[idx]; }
+          const a = Math.abs(acc);
+          if(a>peak) peak=a;
+        }
+      }
+    }
+    return 20*Math.log10(peak+1e-12);
+  }
+  // Chunked/async true-peak (used in the main pipeline so the UI can show progress)
+  async function measureTruePeakDbAsync(channels, onProgress){
+    const sub = getTruePeakFilters();
+    let peak = 0;
+    const totalWork = channels.length * sub.length;
+    let done = 0;
+    for(const x of channels){
+      for(let p=0;p<sub.length;p++){
+        const g = sub[p], L = g.length;
+        for(let m=0;m<x.length;m++){
+          let acc=0;
+          for(let t=0;t<L;t++){ const idx=m-t; if(idx>=0) acc += g[t]*x[idx]; }
+          const a = Math.abs(acc);
+          if(a>peak) peak=a;
+          if((m & 32767)===0) await yieldUI();
+        }
+        done++;
+        if(onProgress) onProgress(done/totalWork);
+      }
+    }
+    return 20*Math.log10(peak+1e-12);
+  }
+
   // ================= VU needle meter =================
   const vuCanvas = $('vuCanvas');
   const vuCtx = vuCanvas.getContext('2d');
@@ -603,6 +730,7 @@
   };
 
   function applyPreset(name){
+    $('eqHint').style.display = 'none';
     if(name==='custom') return;
     const p = PRESETS[name];
     document.querySelectorAll('.eqSlider').forEach((sl,i)=>{
@@ -618,6 +746,25 @@
   }
 
   $('presetSelect').addEventListener('change', (e)=> applyPreset(e.target.value));
+
+  $('btnSmartEq').addEventListener('click', ()=>{
+    if(!state.originalBuffer) return;
+    const buf = state.originalBuffer;
+    const channels = [];
+    for(let c=0;c<buf.numberOfChannels;c++) channels.push(buf.getChannelData(c).slice());
+    const bandDb = analyzeSpectralBalance(channels, buf.sampleRate);
+    const suggestion = suggestSmartEQ(bandDb);
+    document.querySelectorAll('.eqSlider').forEach((sl,i)=>{
+      sl.value = suggestion[i];
+      $('eqVal'+i).textContent = (suggestion[i]>0?'+':'')+suggestion[i]+'dB';
+    });
+    $('presetSelect').value = 'custom';
+    const nearestKey = nearestPresetKey(suggestion);
+    const hint = $('eqHint');
+    hint.style.display = 'block';
+    hint.textContent = '✦ 스마트 EQ 적용됨 — 밴드별 에너지를 곡 평균에 맞춰 자동 보정 · 가장 비슷한 프리셋: '+PRESET_LABELS[nearestKey];
+    log('스마트 EQ 분석 완료 — 유사 프리셋: '+PRESET_LABELS[nearestKey]+', 보정값 '+suggestion.map(v=>(v>0?'+':'')+v).join('/'), 'ok');
+  });
 
   document.querySelectorAll('.eqSlider').forEach((sl,i)=>{
     sl.addEventListener('input', ()=>{
@@ -640,6 +787,73 @@
     $('ceilingVal').textContent = parseFloat(e.target.value).toFixed(1)+' dB';
   });
 
+  // ================= User presets (localStorage) =================
+  const USER_PRESET_KEY = 'sunoMasterUserPresets';
+  function loadUserPresets(){
+    try{ return JSON.parse(localStorage.getItem(USER_PRESET_KEY) || '{}'); }
+    catch(e){ return {}; }
+  }
+  function saveUserPresets(obj){
+    localStorage.setItem(USER_PRESET_KEY, JSON.stringify(obj));
+  }
+  function currentSettingsSnapshot(){
+    return {
+      eq: Array.from(document.querySelectorAll('.eqSlider')).map(s=>parseFloat(s.value)),
+      noise: parseFloat($('noiseAmt').value),
+      ai: parseFloat($('aiDenoiseAmt').value),
+      width: parseFloat($('widthAmt').value),
+      targetLufs: parseFloat($('targetLufs').value),
+      ceiling: parseFloat($('ceiling').value),
+    };
+  }
+  function applySettingsSnapshot(p){
+    document.querySelectorAll('.eqSlider').forEach((sl,i)=>{
+      sl.value = p.eq[i];
+      $('eqVal'+i).textContent = (p.eq[i]>0?'+':'')+p.eq[i]+'dB';
+    });
+    $('noiseAmt').value = p.noise; $('noiseAmtVal').textContent = p.noise+'%';
+    $('aiDenoiseAmt').value = p.ai; $('aiDenoiseAmtVal').textContent = p.ai+'%';
+    $('widthAmt').value = p.width; $('widthAmtVal').textContent = p.width+'%';
+    $('targetLufs').value = p.targetLufs; $('targetLufsVal').textContent = p.targetLufs+' LUFS';
+    $('ceiling').value = p.ceiling; $('ceilingVal').textContent = parseFloat(p.ceiling).toFixed(1)+' dB';
+    $('presetSelect').value = 'custom';
+    $('eqHint').style.display = 'none';
+  }
+  function refreshUserPresetSelect(){
+    const presets = loadUserPresets();
+    const names = Object.keys(presets);
+    const sel = $('userPresetSelect');
+    sel.innerHTML = names.map(n=>`<option value="${n}">${n}</option>`).join('');
+    $('userPresetRow').style.display = names.length ? 'flex' : 'none';
+  }
+  $('btnSavePreset').addEventListener('click', ()=>{
+    const name = $('userPresetName').value.trim();
+    if(!name){ log('프리셋 이름을 입력하세요.', 'warn'); return; }
+    const presets = loadUserPresets();
+    presets[name] = currentSettingsSnapshot();
+    saveUserPresets(presets);
+    $('userPresetName').value = '';
+    refreshUserPresetSelect();
+    $('userPresetSelect').value = name;
+    log('프리셋 저장됨: '+name, 'ok');
+  });
+  $('btnLoadPreset').addEventListener('click', ()=>{
+    const name = $('userPresetSelect').value;
+    if(!name) return;
+    const presets = loadUserPresets();
+    if(presets[name]){ applySettingsSnapshot(presets[name]); log('프리셋 불러옴: '+name, 'ok'); }
+  });
+  $('btnDeletePreset').addEventListener('click', ()=>{
+    const name = $('userPresetSelect').value;
+    if(!name) return;
+    const presets = loadUserPresets();
+    delete presets[name];
+    saveUserPresets(presets);
+    refreshUserPresetSelect();
+    log('프리셋 삭제됨: '+name);
+  });
+  refreshUserPresetSelect();
+
   // ================= File loading =================
   const dropzone = $('dropzone');
   const fileInput = $('fileInput');
@@ -656,6 +870,8 @@
 
   async function handleFile(file){
     log('파일 로딩: '+file.name);
+    $('eqHint').style.display = 'none';
+    $('btnNewSong').style.display = 'none';
     const meta = $('fileMeta');
     meta.style.display='block';
     meta.textContent = file.name+' · '+(file.size/1024/1024).toFixed(2)+' MB';
@@ -673,18 +889,19 @@
       log('음량 분석 중 (LUFS 계산)...');
       setTimeout(()=>{
         const lufs = measureLUFS(chans, decoded.sampleRate);
-        const peak = measurePeakDb(chans);
+        const peak = measureTruePeakDb(chans);
         state.origLufsVal = lufs;
         state.peakDb = peak;
         updateLufsDisplay('orig', lufs);
-        $('peakVal').textContent = peak.toFixed(1)+' dBFS';
+        $('peakVal').textContent = peak.toFixed(1)+' dBTP';
         $('peakVal').className = 'value '+(peak > -1 ? 'hot' : 'dim');
         drawVU(lufs);
         drawWaveform(chans[0], '#4b5563');
-        log('원본 러프니스: '+lufs.toFixed(1)+' LUFS, 피크 '+peak.toFixed(1)+' dBFS', 'ok');
+        log('원본 러프니스: '+lufs.toFixed(1)+' LUFS, 트루피크 '+peak.toFixed(1)+' dBTP', 'ok');
         $('btnProcess').disabled = false;
         $('btnPlay').disabled = false;
         $('btnAutoMaster').disabled = false;
+        $('btnSmartEq').disabled = false;
       }, 30);
     }catch(err){
       log('디코딩 실패: 지원되지 않는 파일 형식입니다.', 'warn');
@@ -765,7 +982,7 @@
   // Detects and attenuates narrowband spectral spikes above ~5kHz that are
   // characteristic of AI vocoder / diffusion-model artifacts (comb-like ringing,
   // metallic warble) — distinct from natural broadband harmonic content.
-  function spectralAIDenoise(data, fs, strength){
+  async function spectralAIDenoise(data, fs, strength, onProgress){
     if(strength<=0) return data;
     const N = 1024;
     const hop = N/2; // 50% overlap, exact COLA for Hann
@@ -784,6 +1001,8 @@
     const spikeFactor = 1.7;
     const maxReduction = 0.15 + 0.65*strength; // how far spikes get pulled toward local median
 
+    const totalSteps = Math.max(1, Math.floor((outLen-N)/hop)+1);
+    let step = 0;
     for(let pos=0; pos+N<=outLen; pos+=hop){
       for(let i=0;i<N;i++){ re[i]=padded[pos+i]*window[i]; im[i]=0; }
       fftInPlace(re, im, false);
@@ -810,6 +1029,12 @@
         out[pos+i] += re[i]*window[i];
         norm[pos+i] += window[i]*window[i];
       }
+
+      step++;
+      if(step % 30 === 0){
+        if(onProgress) onProgress(step/totalSteps);
+        await yieldUI();
+      }
     }
 
     const result = new Float32Array(data.length);
@@ -817,6 +1042,7 @@
       const idx = i+pad;
       result[i] = norm[idx]>1e-8 ? out[idx]/norm[idx] : padded[idx];
     }
+    if(onProgress) onProgress(1);
     return result;
   }
 
@@ -853,28 +1079,75 @@
     return { hfRatio, lowRatio, correlation };
   }
 
+  // ================= Smart EQ: per-band spectral balance analysis =================
+  // Splits the track into the same 7 bands as the EQ (via successive highpass
+  // energy subtraction), then nudges outlier bands toward the track's own
+  // average level — a gentle auto-balancing EQ rather than a fixed target curve.
+  const EQ_BAND_EDGES = [30, 100, 250, 650, 1600, 3800, 9000, 16000]; // 8 edges bounding 7 bands
+  function analyzeSpectralBalance(channels, fs){
+    const mono = channels.length>1
+      ? channels[0].map((v,i)=> (v+channels[1][i])*0.5)
+      : channels[0];
+    const edgeEnergy = EQ_BAND_EDGES.map(freq=>{
+      const hp = makeBiquad('highpass', fs, freq, 0, 0.707);
+      const out = runBiquad(hp, mono.slice());
+      let e=0; for(let i=0;i<out.length;i++) e+=out[i]*out[i];
+      return e;
+    });
+    const bandEnergy = [];
+    for(let i=0;i<7;i++) bandEnergy.push(Math.max(0, edgeEnergy[i]-edgeEnergy[i+1]));
+    const total = bandEnergy.reduce((a,b)=>a+b,0) || 1e-12;
+    return bandEnergy.map(e => 10*Math.log10(e/total + 1e-12));
+  }
+  function suggestSmartEQ(bandDb){
+    const mean = bandDb.reduce((a,b)=>a+b,0)/bandDb.length;
+    return bandDb.map(d => Math.max(-6, Math.min(6, Math.round(-(d-mean)*0.5))));
+  }
+  function nearestPresetKey(eqVec){
+    let best=null, bestDist=Infinity;
+    for(const key of Object.keys(PRESETS)){
+      const p = PRESETS[key];
+      let d=0; for(let i=0;i<7;i++){ const diff=eqVec[i]-p.eq[i]; d+=diff*diff; }
+      if(d<bestDist){ bestDist=d; best=key; }
+    }
+    return best;
+  }
+  const PRESET_LABELS = { standard:'Standard', clean:'Clean', punchy:'Punchy', warm:'Warm', airy:'Airy', vshape:'V-Shape' };
+
   // ================= DSP chain =================
   function processAudio(){
     if(!state.originalBuffer) return;
     $('btnProcess').disabled = true;
     $('btnAutoMaster').disabled = true;
+    $('btnNewSong').style.display = 'none';
     log('마스터링 처리 시작... (AI 아티팩트 제거 단계는 몇 초 걸릴 수 있어요)');
-    // defer so the log message paints before the synchronous DSP work blocks the thread
+    setProgress(0, '처리 준비 중...');
+    // defer so the log message paints before the async DSP work starts
     setTimeout(runProcessing, 30);
   }
 
-  function runProcessing(){
+  async function runProcessing(){
     const buf = state.originalBuffer;
     const fs = buf.sampleRate;
     const numCh = buf.numberOfChannels;
     let channels = [];
     for(let c=0;c<numCh;c++) channels.push(buf.getChannelData(c).slice());
 
-    // 1) AI 아티팩트 제거 (스펙트럴 스파이크 검출/감쇠)
+    // 1) AI 아티팩트 제거 (스펙트럴 스파이크 검출/감쇠) — heaviest step, chunked with progress
     const aiDenoiseAmt = parseFloat($('aiDenoiseAmt').value)/100;
     if(aiDenoiseAmt > 0){
-      channels = channels.map(ch => spectralAIDenoise(ch, fs, aiDenoiseAmt));
+      setProgress(2, 'AI 아티팩트 제거 중...');
+      const denoised = [];
+      for(let c=0;c<channels.length;c++){
+        denoised.push(await spectralAIDenoise(channels[c], fs, aiDenoiseAmt, (f)=>{
+          const overall = (c + f) / channels.length; // 0..1 across all channels
+          setProgress(2 + overall*58, 'AI 아티팩트 제거 중... '+Math.round(overall*100)+'%');
+        }));
+      }
+      channels = denoised;
       log('AI 아티팩트 제거 적용 ('+Math.round(aiDenoiseAmt*100)+'%) — 스펙트럴 스파이크 감쇠');
+    } else {
+      setProgress(60);
     }
 
     // 2) 톤 노이즈 억제: peaking cut ~10.5kHz + high shelf cut >13kHz
@@ -891,6 +1164,7 @@
       });
       log('고역 노이즈 억제 적용 ('+Math.round(noiseAmt*100)+'%)');
     }
+    setProgress(65, 'EQ / 스테레오 폭 처리 중...');
 
     // 2) Tone EQ (5 band)
     const eqGains = Array.from(document.querySelectorAll('.eqSlider')).map(s=>parseFloat(s.value));
@@ -925,6 +1199,7 @@
       channels[0]=newL; channels[1]=newR;
       log('스테레오 폭 조절: '+Math.round(widthPct*100)+'%');
     }
+    setProgress(72, '음압 보정 중...');
 
     // 4) Measure loudness, apply gain to hit target LUFS
     const targetLufs = parseFloat($('targetLufs').value);
@@ -936,7 +1211,8 @@
     }
     log('음압 보정: '+measuredLufs.toFixed(1)+' → '+targetLufs+' LUFS ('+(gainDb>0?'+':'')+gainDb.toFixed(1)+'dB 게인)');
 
-    // 5) True-peak safety limiter (simple lookahead brickwall)
+    // 5) Sample-peak safety limiter (lookahead brickwall)
+    setProgress(78, '리미터 처리 중...');
     const ceilingDb = parseFloat($('ceiling').value);
     const ceilingLin = Math.pow(10, ceilingDb/20);
     let peakAfter = 0;
@@ -966,23 +1242,42 @@
         }
       }
       for(const ch of channels) for(let i=0;i<n;i++) ch[i] *= gainEnv[i];
-      log('리미터 작동: 피크를 '+ceilingDb.toFixed(1)+'dB 이하로 제한', 'warn');
+      log('리미터 작동: 샘플 피크를 '+ceilingDb.toFixed(1)+'dB 이하로 제한', 'warn');
     }
+
+    // 6) True-peak (dBTP) verification — sample-peak limiting alone can leave
+    // inter-sample overs above the ceiling, so measure with 4x oversampling
+    // and apply one extra broadband trim if it's still hot.
+    setProgress(82, '트루피크 확인 중...');
+    let truePeakDb = await measureTruePeakDbAsync(channels, (f)=>{
+      setProgress(82 + f*13, '트루피크 확인 중... '+Math.round(f*100)+'%');
+    });
+    if(truePeakDb > ceilingDb){
+      const extraGainDb = ceilingDb - truePeakDb - 0.1; // small extra margin
+      const extraGainLin = Math.pow(10, extraGainDb/20);
+      for(const ch of channels) for(let i=0;i<ch.length;i++) ch[i] *= extraGainLin;
+      log('트루피크 보정: 인터샘플 오버 감지 · 추가 '+extraGainDb.toFixed(1)+'dB 트림', 'warn');
+      truePeakDb += extraGainDb;
+    }
+    setProgress(97, '마무리 중...');
 
     state.processedChannels = channels;
     state.processedSampleRate = fs;
 
     const finalLufs = measureLUFS(channels.map(c=>c.slice()), fs);
-    const finalPeak = measurePeakDb(channels);
     state.procLufsVal = finalLufs;
     updateLufsDisplay('proc', finalLufs);
     drawVU(finalLufs);
     drawWaveform(channels[0], '#e8a33d');
-    log('마스터링 완료 · 최종 '+finalLufs.toFixed(1)+' LUFS, 피크 '+finalPeak.toFixed(1)+' dBFS', 'ok');
+    log('마스터링 완료 · 최종 '+finalLufs.toFixed(1)+' LUFS, 트루피크 '+truePeakDb.toFixed(1)+' dBTP', 'ok');
 
     $('btnExport').disabled = false;
+    $('btnExportMp3').disabled = false;
     $('btnProcess').disabled = false;
     $('btnAutoMaster').disabled = false;
+    $('btnNewSong').style.display = 'inline-block';
+    setProgress(100, '완료');
+    setTimeout(hideProgress, 900);
     $('btnB').click();
   }
 
@@ -1043,6 +1338,49 @@
     }, 30);
   });
 
+  // ================= Real-time spectrum analyzer =================
+  let analyserNode = null;
+  function getAnalyser(){
+    if(!analyserNode){
+      const ctx = getAudioCtx();
+      analyserNode = ctx.createAnalyser();
+      analyserNode.fftSize = 1024;
+      analyserNode.smoothingTimeConstant = 0.75;
+    }
+    return analyserNode;
+  }
+  const specCanvas = $('specCanvas');
+  const specCtx = specCanvas.getContext('2d');
+  let specRAF = null;
+  function drawSpectrumFrame(){
+    const analyser = getAnalyser();
+    const bufferLength = analyser.frequencyBinCount;
+    const data = new Uint8Array(bufferLength);
+    analyser.getByteFrequencyData(data);
+    const w = specCanvas.width, h = specCanvas.height;
+    specCtx.clearRect(0,0,w,h);
+    specCtx.fillStyle = '#101215';
+    specCtx.fillRect(0,0,w,h);
+    const bars = 64;
+    const barW = w/bars;
+    for(let i=0;i<bars;i++){
+      // log-ish bucket mapping so low end isn't crushed into one bar
+      const idx = Math.min(bufferLength-1, Math.floor(Math.pow(i/bars, 2.2)*bufferLength));
+      const v = data[idx]/255;
+      const barH = Math.max(1, v*h);
+      specCtx.fillStyle = v>0.85 ? '#e5484d' : '#5fd3c4';
+      specCtx.fillRect(i*barW+1, h-barH, Math.max(1,barW-2), barH);
+    }
+    specRAF = requestAnimationFrame(drawSpectrumFrame);
+  }
+  function startSpectrum(){
+    if(!specRAF) drawSpectrumFrame();
+  }
+  function stopSpectrum(){
+    if(specRAF){ cancelAnimationFrame(specRAF); specRAF=null; }
+    specCtx.clearRect(0,0,specCanvas.width,specCanvas.height);
+  }
+
   // ================= A/B playback =================
   function stopPlayback(){
     if(state.sourceNode){
@@ -1051,6 +1389,7 @@
     }
     state.isPlaying = false;
     $('btnStop').disabled = true;
+    stopSpectrum();
   }
 
   function bufferFromChannels(channels, sampleRate){
@@ -1070,14 +1409,17 @@
       bufferToPlay = state.originalBuffer;
     }
     if(!bufferToPlay) return;
+    const analyser = getAnalyser();
     const src = ctx.createBufferSource();
     src.buffer = bufferToPlay;
-    src.connect(ctx.destination);
-    src.onended = ()=>{ state.isPlaying=false; $('btnStop').disabled=true; };
+    src.connect(analyser);
+    analyser.connect(ctx.destination);
+    src.onended = ()=>{ state.isPlaying=false; $('btnStop').disabled=true; stopSpectrum(); };
     src.start();
     state.sourceNode = src;
     state.isPlaying = true;
     $('btnStop').disabled = false;
+    startSpectrum();
     log('재생: '+(state.playMode==='B' ? 'B (마스터링본)' : 'A (원본)'));
   });
   $('btnStop').addEventListener('click', stopPlayback);
@@ -1143,6 +1485,67 @@
     document.body.removeChild(a);
     setTimeout(()=>URL.revokeObjectURL(url), 2000);
     log('WAV 파일 저장 완료: mastered_output.wav', 'ok');
+  });
+
+  // ================= MP3 export (lamejs) =================
+  function floatToInt16(channel){
+    const out = new Int16Array(channel.length);
+    for(let i=0;i<channel.length;i++){
+      let s = Math.max(-1, Math.min(1, channel[i]));
+      out[i] = s<0 ? s*0x8000 : s*0x7FFF;
+    }
+    return out;
+  }
+
+  async function encodeMp3(channels, sampleRate, kbps){
+    const numCh = Math.min(2, channels.length);
+    const encoder = new lamejs.Mp3Encoder(numCh, sampleRate, kbps);
+    const left = floatToInt16(channels[0]);
+    const right = numCh>1 ? floatToInt16(channels[1]) : null;
+    const blockSize = 1152;
+    const mp3Data = [];
+    const total = left.length;
+    for(let i=0;i<total;i+=blockSize){
+      const leftChunk = left.subarray(i, i+blockSize);
+      const buf = right
+        ? encoder.encodeBuffer(leftChunk, right.subarray(i, i+blockSize))
+        : encoder.encodeBuffer(leftChunk);
+      if(buf.length>0) mp3Data.push(buf);
+      if((i/blockSize) % 200 === 0){
+        setProgress(Math.min(99, (i/total)*100), 'MP3 인코딩 중... '+Math.round((i/total)*100)+'%');
+        await yieldUI();
+      }
+    }
+    const endBuf = encoder.flush();
+    if(endBuf.length>0) mp3Data.push(endBuf);
+    return new Blob(mp3Data, {type:'audio/mp3'});
+  }
+
+  $('btnExportMp3').addEventListener('click', async ()=>{
+    if(!state.processedChannels) return;
+    if(typeof lamejs === 'undefined'){
+      log('MP3 인코더 로딩 중입니다. 잠시 후 다시 시도해주세요.', 'warn');
+      return;
+    }
+    $('btnExportMp3').disabled = true;
+    setProgress(0, 'MP3 인코딩 준비 중...');
+    try{
+      const blob = await encodeMp3(state.processedChannels, state.processedSampleRate, 192);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'mastered_output.mp3';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(()=>URL.revokeObjectURL(url), 2000);
+      log('MP3 파일 저장 완료: mastered_output.mp3', 'ok');
+    }catch(err){
+      log('MP3 인코딩 실패: '+err.message, 'warn');
+      console.error(err);
+    }
+    $('btnExportMp3').disabled = false;
+    hideProgress();
   });
 
 })();
