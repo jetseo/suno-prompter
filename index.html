@@ -1,779 +1,1628 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Suno AI Prompter</title>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg:#080c10;--surface:#0e1318;--surface2:#141a22;--surface3:#1c242e;
-      --border:rgba(255,255,255,0.07);--border-bright:rgba(255,255,255,0.15);
-      --accent:#00e5a0;--accent2:#00b8ff;--accent3:#ff6b6b;
-      --text:#e8edf2;--text2:#8a9ab0;--text3:#4a5a6a;--yellow:#ffd93d;
-      --mono:'Space Mono',monospace;--sans:'DM Sans',sans-serif;
-    }
-    *{box-sizing:border-box;margin:0;padding:0;}
-    html,body{height:100%;overflow:hidden;}
-    body{background:var(--bg);font-family:var(--sans);color:var(--text);display:flex;flex-direction:column;}
-    .header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;}
-    .logo{display:flex;align-items:center;gap:10px;}
-    .logo-dot{width:30px;height:30px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:15px;}
-    .logo-text{font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:0.08em;color:var(--accent);}
-    .logo-sub{font-size:10px;color:var(--text3);letter-spacing:0.04em;}
-    .tab-strip{display:flex;gap:4px;padding:10px 20px;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;flex-shrink:0;}
-    .tab-strip::-webkit-scrollbar{display:none;}
-    .tab{display:flex;align-items:center;gap:5px;padding:7px 16px;border-radius:8px;border:1px solid var(--border);cursor:pointer;font-size:12px;font-weight:500;color:var(--text3);background:none;transition:all 0.15s;white-space:nowrap;font-family:var(--sans);}
-    .tab:hover{border-color:var(--border-bright);color:var(--text2);}
-    .tab.active{background:var(--accent);color:#000;border-color:var(--accent);}
-    .tab.done{border-color:rgba(0,229,160,0.3);color:var(--accent);}
-    .tab .check{display:none;font-size:10px;}
-    .tab.done .check{display:inline;}
-    .main{display:grid;grid-template-columns:330px 1fr 280px;flex:1;overflow:hidden;}
-    .panel{overflow-y:auto;overflow-x:hidden;padding:18px;scrollbar-width:thin;scrollbar-color:var(--surface3) transparent;}
-    .panel::-webkit-scrollbar{width:4px;}
-    .panel::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:2px;}
-    .left-panel{border-right:1px solid var(--border);}
-    .mid-panel{border-right:1px solid var(--border);}
-    .panel-title{font-family:var(--mono);font-size:11px;letter-spacing:0.1em;color:var(--text3);text-transform:uppercase;margin-bottom:16px;}
-    .section-label{font-size:11px;color:var(--text3);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:8px;margin-top:16px;}
-    .section-label:first-of-type{margin-top:0;}
-    .btn-grid{display:flex;flex-wrap:wrap;gap:6px;}
-    .sel-btn{padding:6px 12px;border-radius:7px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);font-size:12px;cursor:pointer;transition:all 0.15s;font-family:var(--sans);}
-    .sel-btn:hover{border-color:var(--border-bright);color:var(--text);}
-    .sel-btn.selected{background:rgba(0,229,160,0.12);border-color:var(--accent);color:var(--accent);}
-    .bpm-display{font-family:var(--mono);font-size:44px;font-weight:700;color:var(--accent);letter-spacing:-0.02em;margin-bottom:10px;}
-    .bpm-display span{font-size:16px;color:var(--text3);margin-left:4px;}
-    .bpm-slider{width:100%;height:4px;border-radius:2px;background:var(--surface3);appearance:none;outline:none;cursor:pointer;margin-bottom:10px;}
-    .bpm-slider::-webkit-slider-thumb{appearance:none;width:18px;height:18px;border-radius:50%;background:var(--accent);cursor:pointer;box-shadow:0 0 8px rgba(0,229,160,0.5);}
-    .bpm-input-row{display:flex;align-items:center;gap:8px;margin-bottom:4px;}
-    .bpm-num{width:70px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:13px;padding:6px 10px;border-radius:6px;outline:none;}
-    .bpm-num:focus{border-color:var(--accent);}
-    .bpm-hint{font-size:11px;color:var(--text3);}
-    .preset-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:12px;}
-    .preset-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 11px;cursor:pointer;transition:all 0.15s;}
-    .preset-card:hover{border-color:var(--border-bright);}
-    .preset-card.selected{border-color:var(--accent);background:rgba(0,229,160,0.07);}
-    .preset-name{font-size:12px;font-weight:500;color:var(--text);}
-    .preset-bpm{font-family:var(--mono);font-size:10px;color:var(--accent);margin-top:1px;}
-    .preset-desc{font-size:10px;color:var(--text3);margin-top:2px;}
-    .text-inp{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:var(--sans);font-size:12px;padding:10px 12px;border-radius:8px;outline:none;resize:vertical;min-height:70px;line-height:1.5;}
-    .text-inp:focus{border-color:var(--accent);}
-    .text-inp::placeholder{color:var(--text3);}
-    .reset-row{display:flex;justify-content:flex-end;margin-top:18px;}
-    .reset-btn{background:none;border:1px solid var(--border);color:var(--text3);font-size:11px;font-family:var(--sans);padding:6px 14px;border-radius:6px;cursor:pointer;transition:all 0.15s;}
-    .reset-btn:hover{border-color:var(--accent3);color:var(--accent3);}
-    .mid-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
-    .save-btn{background:none;border:1px solid var(--border);color:var(--text3);font-size:10px;font-family:var(--sans);padding:5px 11px;border-radius:5px;cursor:pointer;transition:all 0.15s;}
-    .save-btn:hover{border-color:var(--accent2);color:var(--accent2);}
-    .status-badge{padding:10px 13px;border-radius:8px;font-size:12px;margin-bottom:14px;border:1px solid;line-height:1.4;}
-    .status-ok{background:rgba(0,229,160,0.08);border-color:rgba(0,229,160,0.25);color:var(--accent);}
-    .status-warn{background:rgba(255,217,61,0.08);border-color:rgba(255,217,61,0.25);color:var(--yellow);}
-    .status-empty{background:rgba(138,154,176,0.08);border-color:rgba(138,154,176,0.12);color:var(--text3);}
-    .sum-row{display:flex;justify-content:space-between;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--border);gap:10px;}
-    .sum-row:last-child{border-bottom:none;}
-    .sum-key{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em;min-width:55px;padding-top:1px;flex-shrink:0;}
-    .sum-val{font-size:12px;color:var(--text);text-align:right;flex:1;}
-    .sum-val.empty{color:var(--text3);font-style:italic;}
-    .sum-val.bpm{font-family:var(--mono);color:var(--accent);}
-    .prompt-box{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:13px;font-family:var(--mono);font-size:11px;color:var(--text);line-height:1.7;min-height:130px;word-break:break-word;margin-bottom:8px;}
-    .prompt-box.empty{color:var(--text3);font-family:var(--sans);font-style:italic;font-size:12px;}
-    .char-count{font-family:var(--mono);font-size:10px;color:var(--text3);text-align:right;margin-bottom:10px;}
-    .char-count .over{color:var(--accent3);}
-    .copy-btn{width:100%;background:var(--accent);border:none;color:#000;font-family:var(--sans);font-size:12px;font-weight:600;padding:10px;border-radius:8px;cursor:pointer;transition:all 0.15s;margin-bottom:14px;}
-    .copy-btn:hover{background:#00ffb2;}
-    .copy-btn:active{transform:scale(0.98);}
-    .copy-btn.copied{background:var(--surface3);color:var(--accent);border:1px solid var(--accent);}
-    .mod-title{font-size:11px;color:var(--text3);letter-spacing:0.06em;text-transform:uppercase;margin-bottom:9px;}
-    .mod-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
-    .mod-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text2);font-size:11px;font-family:var(--sans);padding:8px 10px;border-radius:7px;cursor:pointer;transition:all 0.15s;text-align:center;}
-    .mod-btn:hover{border-color:var(--accent2);color:var(--accent2);}
-    .mod-btn.active{background:rgba(0,184,255,0.1);border-color:var(--accent2);color:var(--accent2);}
-    .mod-result{margin-top:10px;background:var(--surface2);border:1px solid rgba(0,184,255,0.2);border-radius:8px;padding:11px;font-family:var(--mono);font-size:10px;color:var(--text);line-height:1.6;word-break:break-word;}
-    .genre-hint{font-size:11px;color:var(--accent);margin-bottom:8px;}
-    /* TOOLTIP */
-    .tip-wrap{position:relative;display:inline-block;}
-    .tip-wrap .tooltip{
-      visibility:hidden;opacity:0;
-      position:absolute;bottom:calc(100% + 7px);left:50%;
-      transform:translateX(-50%) translateY(3px);
-      background:#1c2a38;border:1px solid rgba(0,229,160,0.22);
-      color:#a0b4c8;font-size:11px;font-family:var(--sans);line-height:1.5;
-      padding:7px 10px;border-radius:7px;
-      width:max-content;max-width:200px;white-space:normal;
-      box-shadow:0 4px 16px rgba(0,0,0,0.55);
-      pointer-events:none;transition:opacity 0.15s,transform 0.15s;
-      z-index:9999;
-    }
-    .tip-wrap:hover .tooltip{visibility:visible;opacity:1;transform:translateX(-50%) translateY(0);}
-    .tip-wrap .tooltip::after{
-      content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);
-      border:5px solid transparent;border-top-color:#1c2a38;
-    }
-    #resetAllBtn{background:none;border:1px solid var(--border);color:var(--text3);font-size:11px;font-family:var(--sans);padding:6px 14px;border-radius:6px;cursor:pointer;transition:all 0.15s;}
-    #resetAllBtn:hover{border-color:var(--accent3);color:var(--accent3);}
-    .header-actions{display:flex;align-items:center;gap:10px;}
-    .header-link{font-family:var(--sans);font-size:11px;color:var(--accent2);border:1px solid var(--border);border-radius:6px;padding:6px 12px;text-decoration:none;white-space:nowrap;}
-    .header-ver{font-family:var(--mono);font-size:11px;color:var(--text3);white-space:nowrap;}
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Suno Master — 수노 AI 전용 마스터링 툴</title>
+<script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.0/lame.min.js" defer></script>
+<style>
+  @font-face {
+    font-family: 'Pretendard';
+    src: url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/woff2/PretendardVariable.woff2') format('woff2');
+    font-weight: 45 920;
+  }
+  :root{
+    --bg: #14161a;
+    --panel: #1b1e24;
+    --panel-2: #21252c;
+    --line: #2c313a;
+    --amber: #e8a33d;
+    --amber-dim: #7a5a26;
+    --teal: #5fd3c4;
+    --text: #edeae3;
+    --text-dim: #8b909c;
+    --red: #e5484d;
+    --green: #59c17b;
+    --blue: #5a8fd6;
+    --mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background: linear-gradient(180deg, #17191f 0%, var(--bg) 40%);
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: 'Pretendard', -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
+    min-height:100vh;
+    padding: 28px 16px 80px;
+  }
+  .wrap{ max-width: 980px; margin: 0 auto; }
 
-    /* ---------- Responsive (tablet / mobile) ---------- */
-    @media (max-width: 860px){
-      html,body{height:auto;min-height:100%;overflow:visible;}
-      body{overflow-x:hidden;}
-      .header{flex-wrap:wrap;padding:12px 14px;}
-      .header-actions{flex-wrap:wrap;row-gap:8px;}
-      .tab-strip{padding:8px 12px;}
-      .main{display:block;overflow:visible;}
-      .panel{overflow-y:visible;max-height:none;}
-      .left-panel,.mid-panel{border-right:none;border-bottom:1px solid var(--border);}
-    }
-    @media (max-width: 480px){
-      .logo-sub{display:none;}
-      .logo-text{font-size:12px;}
-      .tab{padding:6px 11px;font-size:11px;}
-      .bpm-display{font-size:32px;}
-      .preset-grid{grid-template-columns:1fr;}
-      .mod-grid{grid-template-columns:1fr;}
-      .header-link,#resetAllBtn{font-size:10px;padding:5px 10px;}
-    }
-  </style>
+  /* ---------- Header / rack top ---------- */
+  header{
+    display:flex; align-items:flex-end; justify-content:space-between;
+    padding: 4px 6px 20px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 22px;
+  }
+  .brand{ display:flex; flex-direction:column; gap:2px; }
+  .brand .mark{
+    font-family: var(--mono);
+    font-size: 11px; letter-spacing: 0.28em;
+    color: var(--amber);
+    text-transform: uppercase;
+  }
+  .brand h1{
+    margin:0; font-size: 26px; font-weight: 800; letter-spacing: -0.01em;
+  }
+  .brand h1 span{ color: var(--text-dim); font-weight: 500; }
+  .badge{
+    font-family: var(--mono); font-size: 11px; color: var(--text-dim);
+    border: 1px solid var(--line); border-radius: 20px; padding: 5px 12px;
+    display:flex; align-items:center; gap:6px;
+  }
+  .badge .dot{ width:6px; height:6px; border-radius:50%; background: var(--green); box-shadow: 0 0 6px var(--green); }
+
+  /* ---------- Module (rack unit) ---------- */
+  .module{
+    background: linear-gradient(180deg, var(--panel-2), var(--panel));
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 18px 20px 20px;
+    margin-bottom: 16px;
+    position: relative;
+  }
+  .module::before{
+    content:"";
+    position:absolute; left:14px; right:14px; top:0; height:1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent);
+  }
+  .module h2{
+    font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--text-dim); font-weight: 700; margin: 0 0 14px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .module h2 .num{
+    font-family: var(--mono); color: var(--amber); font-size: 11px;
+    border:1px solid var(--amber-dim); border-radius:4px; padding:1px 6px;
+  }
+
+  /* ---------- Dropzone ---------- */
+  #dropzone{
+    border: 1.5px dashed var(--line);
+    border-radius: 8px;
+    padding: 30px 20px;
+    text-align:center;
+    cursor:pointer;
+    transition: border-color .15s, background .15s;
+  }
+  #dropzone:hover, #dropzone.drag{
+    border-color: var(--amber);
+    background: rgba(232,163,61,0.05);
+  }
+  #dropzone .big{ font-size:15px; font-weight:600; margin-bottom:6px; }
+  #dropzone .small{ font-size:12.5px; color: var(--text-dim); }
+  #fileInput{ display:none; }
+  #fileMeta{ margin-top:14px; font-family: var(--mono); font-size:12px; color: var(--text-dim); display:none; }
+
+  /* ---------- VU Meter (signature element) ---------- */
+  .meterRow{ display:flex; gap:22px; align-items:center; flex-wrap:wrap; margin-top: 14px; }
+  .vu{ position:relative; width:220px; }
+  canvas#vuCanvas{ width:100%; height:auto; display:block; }
+  .lufsReadout{ display:flex; gap:26px; flex:1; min-width:220px; }
+  .lufsBox .label{ font-size:11px; color:var(--text-dim); letter-spacing:.08em; text-transform:uppercase; }
+  .lufsBox .value{ font-family: var(--mono); font-size:26px; font-weight:700; margin-top:2px; }
+  .lufsBox .value.dim{ color: var(--text-dim); }
+  .lufsBox .value.ok{ color: var(--green); }
+  .lufsBox .value.hot{ color: var(--red); }
+  .lufsBox .unit{ font-size:12px; color:var(--text-dim); font-weight:400; }
+
+  /* ---------- Sliders ---------- */
+  .row{ display:flex; align-items:center; gap:14px; margin-bottom:14px; }
+  .row:last-child{ margin-bottom:0; }
+  .row label{ width:150px; flex-shrink:0; font-size:13px; color:var(--text); }
+  .row .sub{ display:block; font-size:11px; color:var(--text-dim); font-weight:400; margin-top:1px; }
+  input[type=range]{
+    -webkit-appearance:none; flex:1; height:4px; border-radius:2px;
+    background: var(--line); outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:16px; height:16px; border-radius:50%;
+    background: var(--amber); cursor:pointer; border:2px solid #17191f;
+    box-shadow: 0 0 0 1px var(--amber-dim);
+  }
+  input[type=range]::-moz-range-thumb{
+    width:16px; height:16px; border-radius:50%; background: var(--amber);
+    cursor:pointer; border:2px solid #17191f;
+  }
+  .rowVal{
+    font-family: var(--mono); font-size:12.5px; color: var(--amber);
+    width:56px; text-align:right; flex-shrink:0;
+  }
+
+  /* ---------- EQ band grid ---------- */
+  .eqGrid{ display:grid; grid-template-columns: repeat(7,1fr); gap:6px; margin-top: 4px; }
+  .eqBand{ display:flex; flex-direction:column; align-items:center; gap:6px; }
+  .eqBand .freqLbl{ font-family:var(--mono); font-size:9.5px; color:var(--text-dim); }
+  .eqBand input[type=range]{
+    -webkit-appearance:slider-vertical;
+    writing-mode: bt-lr;
+    width: 6px; height: 90px;
+  }
+  .eqBand .gainLbl{ font-family:var(--mono); font-size:11px; color:var(--amber); }
+
+  select#presetSelect{
+    width:100%; background: var(--panel); color:var(--text); border:1px solid var(--line);
+    border-radius:6px; padding:9px 10px; font-size:13.5px; margin-bottom:14px;
+    font-family:'Pretendard',sans-serif;
+  }
+  .smartHint{
+    font-size:11.5px; color:var(--teal); margin-bottom:12px; padding:8px 11px;
+    background:rgba(95,211,196,0.08); border:1px solid rgba(95,211,196,0.25); border-radius:7px;
+  }
+
+  /* ---------- User presets ---------- */
+  .userPresetInput{
+    flex:1; background: var(--panel); color:var(--text); border:1px solid var(--line);
+    border-radius:6px; padding:9px 10px; font-size:12.5px; outline:none;
+    font-family:'Pretendard',sans-serif;
+  }
+  .userPresetInput:focus{ border-color:var(--amber); }
+  select#userPresetSelect{
+    flex:1; background: var(--panel); color:var(--text); border:1px solid var(--line);
+    border-radius:6px; padding:9px 10px; font-size:12.5px; font-family:'Pretendard',sans-serif;
+  }
+
+  /* ---------- Waveform / spectrum ---------- */
+  #waveCanvas{ width:100%; height:120px; display:block; border-radius:6px; background:#101215; }
+  .waveLegend{ display:flex; gap:16px; margin-top:8px; flex-wrap:wrap; }
+  .legendItem{ display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-dim); font-family:var(--mono); }
+  .legendItem .swatch{ width:11px; height:11px; border-radius:3px; display:inline-block; }
+  #btnWaveMode.active{ background:var(--red); color:#fff; border-color:var(--red); }
+  #specCanvas{ width:100%; height:64px; display:block; border-radius:6px; background:#101215; margin-top:8px; }
+  .specLabel{ font-size:10.5px; color:var(--text-dim); margin-top:6px; font-family:var(--mono); }
+
+  /* ---------- Progress bar ---------- */
+  .progressWrap{ height:6px; background:var(--line); border-radius:3px; overflow:hidden; margin-top:12px; }
+  .progressBar{ height:100%; width:0%; background:var(--amber); transition:width .12s linear; }
+  .progressLabel{ font-family:var(--mono); font-size:11px; color:var(--text-dim); margin-top:6px; }
+
+  /* ---------- Transport ---------- */
+  .transport{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  button, a.btnlike{
+    font-family:'Pretendard',sans-serif; font-size:13.5px; font-weight:600;
+    border-radius:7px; padding:11px 18px; cursor:pointer; border:1px solid var(--line);
+    background: var(--panel-2); color: var(--text); transition: all .12s;
+    display:inline-block; text-decoration:none;
+  }
+  button:hover:not(:disabled), a.btnlike:hover{ border-color: var(--amber); }
+  button:disabled{ opacity:0.35; cursor:not-allowed; }
+  button.primary{ background: var(--amber); color:#1a1300; border-color: var(--amber); }
+  button.primary:hover:not(:disabled){ background:#f0b158; }
+  button.ghost, a.btnlike.ghost{ background:transparent; }
+  .abToggle{ display:flex; border:1px solid var(--line); border-radius:7px; overflow:hidden; }
+  .abToggle button{ border:none; border-radius:0; }
+  .abToggle button.active{ background: var(--teal); color:#0b1f1c; }
+
+  .statusLog{
+    font-family: var(--mono); font-size:11.5px; color: var(--text-dim);
+    margin-top: 14px; line-height:1.7; max-height:110px; overflow-y:auto;
+    border-top: 1px solid var(--line); padding-top:10px;
+  }
+  .statusLog .ok{ color: var(--green); }
+  .statusLog .warn{ color: var(--amber); }
+
+  footer{ text-align:center; font-size:11.5px; color: var(--text-dim); margin-top: 26px; }
+  a.link{ color: var(--teal); text-decoration:none; }
+
+  @media (max-width: 640px){
+    body{ padding: 20px 12px 60px; }
+    header{ flex-wrap:wrap; row-gap:12px; }
+    .brand h1{ font-size:21px; }
+    .badge{ font-size:10px; padding:4px 9px; }
+    .row{ flex-wrap:wrap; }
+    .row label{ width:100%; }
+    .vu{ width:170px; }
+    .meterRow{ gap:14px; }
+    .lufsReadout{ gap:14px; min-width:0; }
+    .eqGrid{ grid-template-columns: repeat(7,1fr); gap:3px; }
+    .eqBand input[type=range]{ height:70px; }
+    .eqBand .freqLbl{ font-size:8.5px; }
+    .lufsBox .value{ font-size:21px; }
+    .transport{ gap:8px; }
+    .transport button{ padding:10px 13px; font-size:12.5px; }
+  }
+  @media (max-width: 480px){
+    .meterRow{ flex-direction:column; align-items:stretch; }
+    .vu{ width:100%; max-width:240px; margin:0 auto; }
+    .lufsReadout{ width:100%; min-width:0; justify-content:space-between; flex-wrap:wrap; row-gap:10px; }
+  }
+  @media (max-width: 380px){
+    .eqGrid{ gap:2px; }
+    .eqBand .freqLbl{ font-size:7.5px; }
+    .lufsBox .value{ font-size:18px; }
+  }
+</style>
 </head>
 <body>
-<div class="header">
-  <div class="logo">
-    <div class="logo-dot">♪</div>
-    <div>
-      <div class="logo-text">SUNO AI PROMPTER</div>
-      <div class="logo-sub">선택형 AI 음악 프롬프트 빌더</div>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <span class="mark">SUNO MASTER · BROWSER DSP</span>
+      <h1>수노 마스터링 콘솔 <span>v1</span></h1>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; row-gap:8px;">
+      <a href="prompter.html" class="badge" style="text-decoration:none; color:var(--teal); border-color:var(--teal);">🎵 프롬프트 빌더로 이동</a>
+      <div class="badge"><span class="dot"></span>서버 업로드 없음 · 로컬 처리</div>
+    </div>
+  </header>
+
+  <!-- 1. 업로드 & 미터링 -->
+  <div class="module">
+    <h2><span class="num">01</span>파일 업로드 &amp; 러프니스 미터</h2>
+    <div id="dropzone">
+      <div class="big">여기에 오디오 파일을 드래그하거나 클릭해서 선택하세요</div>
+      <div class="small">MP3 · WAV · M4A 지원 · 파일은 브라우저 밖으로 전송되지 않습니다</div>
+      <input type="file" id="fileInput" accept="audio/*">
+    </div>
+    <div id="fileMeta"></div>
+
+    <div class="meterRow">
+      <div class="vu"><canvas id="vuCanvas" width="440" height="240"></canvas></div>
+      <div class="lufsReadout">
+        <div class="lufsBox">
+          <div class="label">원본 LUFS</div>
+          <div class="value dim" id="origLufs">—</div>
+        </div>
+        <div class="lufsBox">
+          <div class="label">처리 후 LUFS</div>
+          <div class="value dim" id="procLufs">—</div>
+        </div>
+        <div class="lufsBox">
+          <div class="label">피크 (TP)</div>
+          <div class="value dim" id="peakVal">—</div>
+        </div>
+      </div>
+    </div>
+
+    <button id="btnAutoMaster" class="primary" disabled style="width:100%; margin-top:16px; padding:14px; font-size:14.5px;">🎯 원클릭 자동 마스터링 — 분석 후 전체 세팅 자동 적용</button>
+    <div class="progressWrap" id="progressWrap" style="display:none;"><div class="progressBar" id="progressBar"></div></div>
+    <div class="progressLabel" id="progressLabel"></div>
+    <div class="statusLog" id="statusLog">대기 중 · 음원 파일을 업로드하면 자동으로 분석을 시작합니다.</div>
+  </div>
+
+  <!-- 2. 고역 노이즈 억제 -->
+  <div class="module">
+    <h2><span class="num">02</span>고역대 노이즈 억제 &amp; AI 아티팩트 제거</h2>
+    <div class="row">
+      <label>톤 노이즈 억제<span class="sub">10.5kHz 메탈릭 노이즈 + 13kHz 이상 시빌런스 (EQ 방식)</span></label>
+      <input type="range" id="noiseAmt" min="0" max="100" value="35">
+      <div class="rowVal" id="noiseAmtVal">35%</div>
+    </div>
+    <div class="row">
+      <label>AI 아티팩트 제거<span class="sub">수노 특유 보코더/스펙트럴 스파이크 노이즈 (FFT 분석 방식)</span></label>
+      <input type="range" id="aiDenoiseAmt" min="0" max="100" value="45">
+      <div class="rowVal" id="aiDenoiseAmtVal">45%</div>
     </div>
   </div>
-  <div class="header-actions">
-    <a href="mastering.html" class="header-link">🎚 마스터링 툴</a>
-    <div class="header-ver">v2.0</div>
-    <button id="resetAllBtn" onclick="resetAll()">전체 초기화</button>
+
+  <!-- 3. Character 프리셋 & EQ -->
+  <div class="module">
+    <h2><span class="num">03</span>음색 성향(Character) &amp; 7밴드 EQ</h2>
+    <button id="btnSmartEq" class="ghost" disabled style="width:100%; margin-bottom:12px;">🧠 스마트 EQ 추천 — 곡 스펙트럼 분석 후 밴드 자동 보정</button>
+    <div class="smartHint" id="eqHint" style="display:none;"></div>
+    <select id="presetSelect">
+      <option value="standard">Standard (기본 밸런스)</option>
+      <option value="clean">Clean (명료한 고음, 뭉침 제거)</option>
+      <option value="punchy">Punchy (단단한 킥/베이스 강조)</option>
+      <option value="warm">Warm (따뜻하고 풍성한 중저음)</option>
+      <option value="airy">Airy (화사하고 넓은 고음역 공간감)</option>
+      <option value="vshape">V-Shape (다이나믹 팝/댄스 - 저/고음 강조)</option>
+      <option value="custom">커스텀 (수동 조정)</option>
+    </select>
+    <div class="eqGrid">
+      <div class="eqBand"><div class="freqLbl">Sub<br>60Hz</div><input type="range" class="eqSlider" data-band="0" min="-10" max="10" value="0"><div class="gainLbl" id="eqVal0">0dB</div></div>
+      <div class="eqBand"><div class="freqLbl">Bass<br>150Hz</div><input type="range" class="eqSlider" data-band="1" min="-10" max="10" value="0"><div class="gainLbl" id="eqVal1">0dB</div></div>
+      <div class="eqBand"><div class="freqLbl">L-Mid<br>400Hz</div><input type="range" class="eqSlider" data-band="2" min="-10" max="10" value="0"><div class="gainLbl" id="eqVal2">0dB</div></div>
+      <div class="eqBand"><div class="freqLbl">Mid<br>1kHz</div><input type="range" class="eqSlider" data-band="3" min="-10" max="10" value="0"><div class="gainLbl" id="eqVal3">0dB</div></div>
+      <div class="eqBand"><div class="freqLbl">H-Mid<br>2.5kHz</div><input type="range" class="eqSlider" data-band="4" min="-10" max="10" value="0"><div class="gainLbl" id="eqVal4">0dB</div></div>
+      <div class="eqBand"><div class="freqLbl">Pres<br>6kHz</div><input type="range" class="eqSlider" data-band="5" min="-10" max="10" value="0"><div class="gainLbl" id="eqVal5">0dB</div></div>
+      <div class="eqBand"><div class="freqLbl">Air<br>12kHz</div><input type="range" class="eqSlider" data-band="6" min="-10" max="10" value="0"><div class="gainLbl" id="eqVal6">0dB</div></div>
+    </div>
+    <div class="row" style="margin-top:16px;">
+      <input type="text" id="userPresetName" class="userPresetInput" placeholder="내 프리셋 이름 (예: 내 발라드 세팅)">
+      <button id="btnSavePreset" class="ghost">💾 현재 세팅 저장</button>
+    </div>
+    <div class="row" id="userPresetRow" style="display:none;">
+      <select id="userPresetSelect"></select>
+      <button id="btnLoadPreset">불러오기</button>
+      <button id="btnDeletePreset" class="ghost">삭제</button>
+    </div>
   </div>
+
+  <!-- 4. 스테레오 폭 -->
+  <div class="module">
+    <h2><span class="num">04</span>스테레오 폭 조절</h2>
+    <div class="row">
+      <label>스테레오 폭<span class="sub">100% = 원본 · 0% = 모노</span></label>
+      <input type="range" id="widthAmt" min="0" max="200" value="100">
+      <div class="rowVal" id="widthAmtVal">100%</div>
+    </div>
+  </div>
+
+  <!-- 5. 최종 음압 보정 -->
+  <div class="module">
+    <h2><span class="num">05</span>최종 음압(LUFS) 보정</h2>
+    <div class="row">
+      <label>목표 러프니스<span class="sub">음원 사이트 권장 -14 ~ -10 LUFS</span></label>
+      <input type="range" id="targetLufs" min="-20" max="-6" value="-14">
+      <div class="rowVal" id="targetLufsVal">-14 LUFS</div>
+    </div>
+    <div class="row">
+      <label>트루피크 한계<span class="sub">클리핑 방지 리미터 천장</span></label>
+      <input type="range" id="ceiling" min="-3" max="0" step="0.1" value="-1">
+      <div class="rowVal" id="ceilingVal">-1.0 dB</div>
+    </div>
+  </div>
+
+  <!-- 6. 비교 & 저장 -->
+  <div class="module">
+    <h2><span class="num">06</span>파형 비교 &amp; 저장</h2>
+    <canvas id="waveCanvas" width="900" height="120"></canvas>
+    <div class="waveLegend" id="waveLegend"></div>
+    <canvas id="specCanvas" width="900" height="64"></canvas>
+    <div class="specLabel">실시간 스펙트럼 · 재생 중에만 표시됩니다</div>
+    <div class="transport" style="margin-top:14px;">
+      <div class="abToggle">
+        <button id="btnA" class="active">A · 원본 재생</button>
+        <button id="btnB">B · 마스터링 재생</button>
+      </div>
+      <button id="btnWaveMode" class="ghost">🔍 차이만 보기</button>
+      <button id="btnProcess" class="primary" disabled>마스터링 처리 실행</button>
+      <button id="btnPlay" disabled>▶ 재생</button>
+      <button id="btnStop" disabled>■ 정지</button>
+      <button id="btnExport" class="ghost" disabled>WAV로 저장</button>
+      <button id="btnExportMp3" class="ghost" disabled>MP3로 저장</button>
+      <a id="btnNewSong" href="prompter.html" class="btnlike ghost" style="display:none;">🎵 새 곡 만들러 가기</a>
+    </div>
+  </div>
+
+  <footer>모든 오디오 처리는 사용자 브라우저 안에서만 이루어지며, 파일은 어디로도 업로드되지 않습니다.</footer>
 </div>
-<div class="tab-strip" id="tabStrip"></div>
-<div class="main">
-  <div class="panel left-panel" id="leftPanel"></div>
-  <div class="panel mid-panel" id="midPanel"></div>
-  <div class="panel right-panel" id="rightPanel"></div>
-</div>
+
 <script>
-// ─── 데이터: 한글 표시 + 영문 프롬프트 값 분리 ───
-const REGIONS = ['아시아','유럽','북미','남미','아프리카','오세아니아','중동'];
+(function(){
+  "use strict";
 
-const COUNTRIES = {
-  '아시아':['한국','일본','인도','중국','태국','인도네시아','필리핀','베트남','말레이시아','몽골'],
-  '유럽':['영국','프랑스','독일','스페인','이탈리아','스웨덴','노르웨이','아일랜드','그리스','포르투갈','러시아','폴란드'],
-  '북미':['미국','캐나다','멕시코','자메이카','쿠바','트리니다드'],
-  '남미':['브라질','콜롬비아','아르헨티나','페루','칠레','베네수엘라','푸에르토리코'],
-  '아프리카':['나이지리아','남아프리카','이집트','가나','세네갈','에티오피아','케냐','말리'],
-  '오세아니아':['호주','뉴질랜드','하와이','피지'],
-  '중동':['이란','터키','이스라엘','레바논','이라크'],
-};
+  // ---------------- Global state ----------------
+  const state = {
+    audioCtx: null,
+    originalBuffer: null,   // decoded AudioBuffer
+    processedChannels: null, // Float32Array[] after DSP
+    processedSampleRate: 44100,
+    origLufsVal: null,
+    procLufsVal: null,
+    peakDb: null,
+    playMode: 'A', // 'A' original, 'B' processed
+    sourceNode: null,
+    isPlaying: false,
+    waveMode: 'overlay', // 'overlay' or 'diff'
+  };
 
-const GENRES = {
-  '한국':['K-Pop','K-R&B','트로트','한국 민요','K-힙합','K-인디','한국 전통음악','발라드'],
-  '일본':['J-Pop','시티팝','엔카','J-록','시부야계','J-소울','오키나와 민요','애니송'],
-  '인도':['볼리우드','방그라','카르나틱 클래식','힌두스타니 클래식','필미','인디팝'],
-  '중국':['만다팝','C-Pop','광둥팝','구금 클래식','중국 전통','C-록'],
-  '태국':['룩퉁','타이팝','모람','타이 록','타이 힙합'],
-  '인도네시아':['당둣','인도네시아팝','가믈란 퓨전','자바 전통','레게 인도네시아'],
-  '필리핀':['OPM','필리핀 팝','쿠팡팝','발라다','필리핀 록'],
-  '베트남':['V-Pop','냐낙','까이르엉','전통 베트남'],
-  '말레이시아':['말레이팝','인디 말레이','당둣 말레이시아'],
-  '몽골':['몽골 민요','흐미','몽골 록','전통 마두금'],
-  '영국':['브릿팝','UK 개러지','드럼앤베이스','그라임','슈게이징','포크 록','포스트 펑크','뉴웨이브','애시드 하우스','UK 소울'],
-  '프랑스':['프렌치팝','샹송','프렌치 일렉트로닉','뮈제트','프렌치 하우스','누보 바그','아프로비트 프랑코'],
-  '독일':['테크노','크라우트록','슐라거','독일 힙합','유로댄스','NDW','앰비언트 베를린'],
-  '스페인':['플라멩코','스페인 팝','룸바 카탈라나','레게톤','스페인 록','파소도블레'],
-  '이탈리아':['이탈리안팝','오페라 퓨전','지중해','이탈리안 칸타우토레','유로비트'],
-  '스웨덴':['스웨디시팝','노르딕 포크','멜로딕 데스메탈','스웨디시 하우스','ABBA 스타일'],
-  '노르웨이':['노르딕 포크','블랙메탈','노르웨이 팝','사미 전통','노르딕 앰비언트'],
-  '아일랜드':['아이리시 포크','켈틱 록','트래드 세션','아이리시 팝'],
-  '그리스':['렘베티코','그리스 팝','비잔틴','그리스 록','라이카'],
-  '포르투갈':['파두','포르투갈 팝','포르투갈 록','케이프 베르데 퓨전'],
-  '러시아':['러시아 팝','발라드 러시아','러시아 록','전통 민요','러시아 힙합'],
-  '폴란드':['폴스카 팝','폴란드 록','폴란드 포크','클럽 폴란드'],
-  '미국':['힙합','R&B','컨트리','블루스','재즈','팝 록','가스펠','소울','모타운','인디 록','얼터너티브','어반 팝','트랩','이모','포스트록'],
-  '캐나다':['캐나디안 포크','인디 록','드레이크 스타일 R&B','퀘벡 팝','캐나다 컨트리'],
-  '멕시코':['마리아치','노르테뇨','반다','멕시코 팝','손 하로초','쿰비아 멕시코'],
-  '자메이카':['레게','댄스홀','스카','록스테디','더브','루츠 레게'],
-  '쿠바':['살사','손 쿠바노','볼레로','팀바','아바나 재즈','과히라'],
-  '트리니다드':['칼립소','소카','스틸팬','트리니다드 댄스홀'],
-  '브라질':['삼바','보사노바','포호','펑크 카리오카','MPB','악시','바이아오','람바다'],
-  '콜롬비아':['쿰비아','발레나토','댄스 라틴','콜롬비아 팝','피케테로'],
-  '아르헨티나':['탱고','아르헨티나 록','포클로레','쿠아르테토','말람보'],
-  '페루':['쿠에카','마리네라','아프로페루','살사 페루','치차'],
-  '칠레':['칠레 록','누에바 칸시온','쿠에카 칠레나','칠레 팝'],
-  '베네수엘라':['조로포','살사 베네수엘라','가이타','베네수엘라 팝'],
-  '푸에르토리코':['레게톤','살사','트랩 라티노','봄바','플레나'],
-  '나이지리아':['아프로비트','주주','하이라이프','아프로팝','푸지','나이하우사'],
-  '남아프리카':['아마피아노','콰이토','아프리칸스팝','음봄베','줄루 전통'],
-  '이집트':['샤아비','아랍 팝','누비안','움 쿨숨 스타일','이집트 재즈'],
-  '가나':['하이라이프','아존토','아프로비트 가나','히프라이프'],
-  '세네갈':['음발라스','사바르 전통','울로프팝','아프로컨템포러리'],
-  '에티오피아':['에티오재즈','암하릭팝','하베샤','에티오 전통'],
-  '케냐':['비코즈','케냐 팝','기쿠유 전통','나이로비 힙합'],
-  '말리':['젤리 전통','말리 블루스','투아레그 사막록'],
-  '호주':['인디 록','호주 힙합','컨트리 오스트레일리아','오지팝'],
-  '뉴질랜드':['마오리 음악','인디팝','키위 록','뉴질랜드 알앤비'],
-  '하와이':['하와이안','훌라 전통','이스트사이드 사운드','로코팝'],
-  '피지':['피지안 포크','퍼시픽 팝','멜라네시아 전통'],
-  '이란':['페르시안팝','이란 전통','다스트가'],
-  '터키':['터키 팝','아라베스크','오스만 전통','터키 록','다마크'],
-  '이스라엘':['이스라엘 팝','미즈라히','요르단 포크퓨전','이스라엘 일렉트로닉'],
-  '레바논':['레바논 팝','아랍 일렉트로닉','타랍'],
-  '이라크':['마캄','이라크 팝','아랍 전통'],
-};
-
-// 장르 → 영문 프롬프트값
-const GENRE_EN = {
-  'K-Pop':'K-Pop','K-R&B':'Korean R&B','트로트':'Trot','한국 민요':'Korean Folk','K-힙합':'K-Hip Hop','K-인디':'Korean Indie','한국 전통음악':'Korean Traditional','발라드':'Korean Ballad',
-  'J-Pop':'J-Pop','시티팝':'City Pop','엔카':'Enka','J-록':'J-Rock','시부야계':'Shibuya-kei','J-소울':'J-Soul','오키나와 민요':'Okinawan Folk','애니송':'Anime OST',
-  '볼리우드':'Bollywood','방그라':'Bhangra','카르나틱 클래식':'Carnatic Classical','힌두스타니 클래식':'Hindustani Classical','필미':'Filmi','인디팝':'Indian Indie Pop',
-  '만다팝':'Mandopop','C-Pop':'C-Pop','광둥팝':'Cantopop','구금 클래식':'Guqin Classical','중국 전통':'Chinese Traditional','C-록':'Chinese Rock',
-  '룩퉁':'Luk Thung','타이팝':'Thai Pop','모람':'Mor Lam','타이 록':'Thai Rock','타이 힙합':'Thai Hip Hop',
-  '당둣':'Dangdut','인도네시아팝':'Indonesian Pop','가믈란 퓨전':'Gamelan Fusion','자바 전통':'Javanese Traditional','레게 인도네시아':'Indonesian Reggae',
-  'OPM':'OPM','필리핀 팝':'Filipino Pop','쿠팡팝':'Cupang Pop','발라다':'Filipino Ballad','필리핀 록':'Filipino Rock',
-  'V-Pop':'V-Pop','냐낙':'Nha Nhac','까이르엉':'Cai Luong','전통 베트남':'Vietnamese Traditional',
-  '말레이팝':'Malay Pop','인디 말레이':'Malay Indie','당둣 말레이시아':'Malaysian Dangdut',
-  '몽골 민요':'Mongolian Folk','흐미':'Khoomei Throat Singing','몽골 록':'Mongolian Rock','전통 마두금':'Morin Khuur Traditional',
-  '브릿팝':'Britpop','UK 개러지':'UK Garage','드럼앤베이스':'Drum and Bass','그라임':'Grime','슈게이징':'Shoegaze','포크 록':'Folk Rock','포스트 펑크':'Post Punk','뉴웨이브':'New Wave','애시드 하우스':'Acid House','UK 소울':'UK Soul',
-  '프렌치팝':'French Pop','샹송':'Chanson','프렌치 일렉트로닉':'French Electronic','뮈제트':'Musette','프렌치 하우스':'French House','누보 바그':'Nouvelle Vague','아프로비트 프랑코':'Franco Afrobeat',
-  '테크노':'Techno','크라우트록':'Krautrock','슐라거':'Schlager','독일 힙합':'German Hip Hop','유로댄스':'Eurodance','NDW':'Neue Deutsche Welle','앰비언트 베를린':'Berlin Ambient',
-  '플라멩코':'Flamenco','스페인 팝':'Spanish Pop','룸바 카탈라나':'Rumba Catalana','레게톤':'Reggaeton','스페인 록':'Spanish Rock','파소도블레':'Pasodoble',
-  '이탈리안팝':'Italian Pop','오페라 퓨전':'Opera Fusion','지중해':'Mediterranean','이탈리안 칸타우토레':'Italian Cantautore','유로비트':'Eurobeat',
-  '스웨디시팝':'Swedish Pop','노르딕 포크':'Nordic Folk','멜로딕 데스메탈':'Melodic Death Metal','스웨디시 하우스':'Swedish House','ABBA 스타일':'ABBA-style Pop',
-  '노르딕 포크':'Nordic Folk','블랙메탈':'Black Metal','노르웨이 팝':'Norwegian Pop','사미 전통':'Sami Traditional','노르딕 앰비언트':'Nordic Ambient',
-  '아이리시 포크':'Irish Folk','켈틱 록':'Celtic Rock','트래드 세션':'Irish Trad Session','아이리시 팝':'Irish Pop',
-  '렘베티코':'Rembetiko','그리스 팝':'Greek Pop','비잔틴':'Byzantine','그리스 록':'Greek Rock','라이카':'Laika',
-  '파두':'Fado','포르투갈 팝':'Portuguese Pop','포르투갈 록':'Portuguese Rock','케이프 베르데 퓨전':'Cape Verdean Fusion',
-  '러시아 팝':'Russian Pop','발라드 러시아':'Russian Ballad','러시아 록':'Russian Rock','전통 민요':'Russian Folk','러시아 힙합':'Russian Hip Hop',
-  '폴스카 팝':'Polish Pop','폴란드 록':'Polish Rock','폴란드 포크':'Polish Folk','클럽 폴란드':'Polish Club',
-  '힙합':'Hip Hop','R&B':'R&B','컨트리':'Country','블루스':'Blues','재즈':'Jazz','팝 록':'Pop Rock','가스펠':'Gospel','소울':'Soul','모타운':'Motown','인디 록':'Indie Rock','얼터너티브':'Alternative Rock','어반 팝':'Urban Pop','트랩':'Trap','이모':'Emo','포스트록':'Post Rock',
-  '캐나디안 포크':'Canadian Folk','드레이크 스타일 R&B':'Drake-style R&B','퀘벡 팝':'Quebec Pop','캐나다 컨트리':'Canadian Country',
-  '마리아치':'Mariachi','노르테뇨':'Norteño','반다':'Banda','멕시코 팝':'Mexican Pop','손 하로초':'Son Jarocho','쿰비아 멕시코':'Mexican Cumbia',
-  '레게':'Reggae','댄스홀':'Dancehall','스카':'Ska','록스테디':'Rocksteady','더브':'Dub','루츠 레게':'Roots Reggae',
-  '살사':'Salsa','손 쿠바노':'Son Cubano','볼레로':'Bolero','팀바':'Timba','아바나 재즈':'Havana Jazz','과히라':'Guajira',
-  '칼립소':'Calypso','소카':'Soca','스틸팬':'Steel Pan','트리니다드 댄스홀':'Trinidad Dancehall',
-  '삼바':'Samba','보사노바':'Bossa Nova','포호':'Forró','펑크 카리오카':'Funk Carioca','MPB':'MPB','악시':'Axé','바이아오':'Baião','람바다':'Lambada',
-  '쿰비아':'Cumbia','발레나토':'Vallenato','댄스 라틴':'Dance Latin','콜롬비아 팝':'Colombian Pop','피케테로':'Piquetero',
-  '탱고':'Tango','아르헨티나 록':'Argentine Rock','포클로레':'Folklore','쿠아르테토':'Cuarteto','말람보':'Malambo',
-  '쿠에카':'Cueca','마리네라':'Marinera','아프로페루':'Afro-Peruvian','살사 페루':'Peruvian Salsa','치차':'Chicha',
-  '칠레 록':'Chilean Rock','누에바 칸시온':'Nueva Canción','쿠에카 칠레나':'Cueca Chilena','칠레 팝':'Chilean Pop',
-  '조로포':'Joropo','살사 베네수엘라':'Venezuelan Salsa','가이타':'Gaita','베네수엘라 팝':'Venezuelan Pop',
-  '트랩 라티노':'Trap Latino','봄바':'Bomba','플레나':'Plena',
-  '아프로비트':'Afrobeats','주주':'Juju','하이라이프':'Highlife','아프로팝':'Afropop','푸지':'Fuji','나이하우사':'Naija Hausa',
-  '아마피아노':'Amapiano','콰이토':'Kwaito','아프리칸스팝':'Afrikaans Pop','음봄베':'Mbombe','줄루 전통':'Zulu Traditional',
-  '샤아비':'Shaabi','아랍 팝':'Arabic Pop','누비안':'Nubian','움 쿨숨 스타일':'Oum Kulthum Style','이집트 재즈':'Egyptian Jazz',
-  '아존토':'Azonto','아프로비트 가나':'Ghana Afrobeats','히프라이프':'Hiplife',
-  '음발라스':'Mbalax','사바르 전통':'Sabar Traditional','울로프팝':'Wolof Pop','아프로컨템포러리':'Afro Contemporary',
-  '에티오재즈':'Ethio-Jazz','암하릭팝':'Amharic Pop','하베샤':'Habesha','에티오 전통':'Ethiopian Traditional',
-  '비코즈':'Benga','케냐 팝':'Kenyan Pop','기쿠유 전통':'Kikuyu Traditional','나이로비 힙합':'Nairobi Hip Hop',
-  '젤리 전통':'Griot Traditional','말리 블루스':'Mali Blues','투아레그 사막록':'Tuareg Desert Rock',
-  '인디 록':'Indie Rock','호주 힙합':'Australian Hip Hop','컨트리 오스트레일리아':'Australian Country','오지팝':'Aussie Pop',
-  '마오리 음악':'Māori Music','인디팝':'Indie Pop','키위 록':'Kiwi Rock','뉴질랜드 알앤비':'New Zealand R&B',
-  '하와이안':'Hawaiian','훌라 전통':'Hula Traditional','이스트사이드 사운드':'East Side Sound','로코팝':'Loco Pop',
-  '피지안 포크':'Fijian Folk','퍼시픽 팝':'Pacific Pop','멜라네시아 전통':'Melanesian Traditional',
-  '페르시안팝':'Persian Pop','이란 전통':'Iranian Traditional','다스트가':'Dastgah',
-  '터키 팝':'Turkish Pop','아라베스크':'Arabesque','오스만 전통':'Ottoman Classical','터키 록':'Turkish Rock','다마크':'Damak',
-  '이스라엘 팝':'Israeli Pop','미즈라히':'Mizrahi','요르단 포크퓨전':'Jordanian Folk Fusion','이스라엘 일렉트로닉':'Israeli Electronic',
-  '레바논 팝':'Lebanese Pop','아랍 일렉트로닉':'Arabic Electronic','타랍':'Tarab',
-  '마캄':'Maqam','이라크 팝':'Iraqi Pop','아랍 전통':'Arabic Traditional',
-};
-
-const MOODS_KO = ['열정적인','애수 어린','황홀한','어두운','향수 어린','따뜻한','몽환적인','공격적인','평화로운','신비로운','낭만적인','에너제틱한','우울한','기쁜','긴장감 있는','차분한','거칠고 날것의','웅장한','잔잔한','관능적인','순수한','외로운','희망찬','드라마틱한','불안한','유쾌한'];
-const MOODS_EN = ['Passionate','Melancholic','Euphoric','Dark','Nostalgic','Warm','Dreamy','Aggressive','Peaceful','Mysterious','Romantic','Energetic','Sad','Joyful','Tense','Calm','Raw and Gritty','Epic','Serene','Sensual','Pure','Lonely','Hopeful','Dramatic','Anxious','Playful'];
-
-const INSTR_BASE_KO = ['피아노','기타','베이스 기타','드럼','바이올린','첼로','트럼펫','색소폰','신디사이저','일렉트릭 기타','어쿠스틱 기타','플루트','오보에','클라리넷','하프','비올라','더블베이스','밴조','만돌린','우쿨렐레','하모니카','아코디언','멜로트론','로즈 피아노','오르간','무그 신스','페달 스틸','현악 4중주','오케스트라 스트링스','브라스 섹션'];
-const INSTR_BASE_EN = ['Piano','Guitar','Bass Guitar','Drums','Violin','Cello','Trumpet','Saxophone','Synthesizer','Electric Guitar','Acoustic Guitar','Flute','Oboe','Clarinet','Harp','Viola','Double Bass','Banjo','Mandolin','Ukulele','Harmonica','Accordion','Mellotron','Rhodes Piano','Organ','Moog Synth','Pedal Steel','String Quartet','Orchestral Strings','Brass Section'];
-
-const INSTR_BY_GENRE_KO = {
-  '삼바':['라틴 퍼커션','나일론 기타','카바키뉴','판데이루','아고고'],
-  '보사노바':['나일론 기타','업라이트 베이스','브러쉬드 드럼','카바키뉴'],
-  'K-Pop':['808 베이스','신스 리드','일렉트로닉 드럼','현악 섹션','보코더'],
-  '레게':['리듬 기타','베이스','혼 섹션','오르간','에코 기타'],
-  '살사':['팀발레스','콩가','트럼펫','피아노','베이스','마라카스'],
-  '플라멩코':['스패니시 기타','카혼','박수','캐스터네츠'],
-  '탱고':['반도네온','바이올린','피아노','더블베이스'],
-  '힙합':['808 베이스','SP-404 샘플러','하이햇','신스 패드'],
-  '재즈':['업라이트 베이스','브러쉬드 드럼','뮤트 트럼펫','해먼드 오르간'],
-  '테크노':['신디사이저','808 드럼 머신','아르프 신스','모듈러 신스'],
-  '쿰비아':['쿰비아 퍼커션','아코디언','기타','베이스'],
-  '블루스':['일렉트릭 기타','하모니카','피아노','드럼 브러쉬'],
-  '아마피아노':['로그 드럼','피아노','베이스라인','신스'],
-  '에티오재즈':['색소폰','비브라폰','아프리칸 퍼커션','업라이트 베이스'],
-  '팀바':['콩가','팀발레스','피아노','트럼펫','베이스'],
-};
-const INSTR_BY_GENRE_EN = {
-  '삼바':['Latin Percussion','Nylon Guitar','Cavaquinho','Pandeiro','Agogo'],
-  '보사노바':['Nylon Guitar','Upright Bass','Brushed Drums','Cavaquinho'],
-  'K-Pop':['808 Bass','Synth Lead','Electronic Drums','String Section','Vocoder'],
-  '레게':['Rhythm Guitar','Bass','Horn Section','Organ','Echo Guitar'],
-  '살사':['Timbales','Congas','Trumpet','Piano','Bass','Maracas'],
-  '플라멩코':['Spanish Guitar','Cajon','Handclaps','Castanets'],
-  '탱고':['Bandoneón','Violin','Piano','Double Bass'],
-  '힙합':['808 Bass','SP-404 Sampler','Hi-Hat','Synth Pad'],
-  '재즈':['Upright Bass','Brushed Drums','Muted Trumpet','Hammond Organ'],
-  '테크노':['Synthesizer','808 Drum Machine','Arp Synth','Modular Synth'],
-  '쿰비아':['Cumbia Percussion','Accordion','Guitar','Bass'],
-  '블루스':['Electric Guitar','Harmonica','Piano','Drum Brushes'],
-  '아마피아노':['Log Drum','Piano','Bassline','Synth'],
-  '에티오재즈':['Saxophone','Vibraphone','African Percussion','Upright Bass'],
-  '팀바':['Congas','Timbales','Piano','Trumpet','Bass'],
-};
-
-const VOCALS_KO = ['남성 보컬','여성 보컬','듀엣','합창','랩 보컬','팔세토','속삭이는 보컬','열정적인 보컬','부드러운 보컬','거친 보컬','무보컬(연주곡)','소울풀한 보컬','오페라틱 보컬','인디 보컬','그루브 보컬','알앤비 보컬','컨트리 보컬','록 보컬','팝 보컬','재즈 보컬'];
-const VOCALS_EN = ['Male Vocal','Female Vocal','Duet','Choir','Rap Vocal','Falsetto','Whisper Vocal','Passionate Vocal','Smooth Vocal','Gritty Vocal','No Vocal (Instrumental)','Soulful Vocal','Operatic Vocal','Indie Vocal','Groove Vocal','R&B Vocal','Country Vocal','Rock Vocal','Pop Vocal','Jazz Vocal'];
-
-const EXTRAS_KO = ['그루브 벌스와 챈트 코러스','콜앤리스폰스 구조','극적인 전조','스포큰 워드 브릿지','아카펠라 구간','점점 사라지는 엔딩','갑작스러운 정지 엔딩','리드믹 반복','에테리얼 리버브 테일','레이어드 하모닉스','드라마틱 빌드업','루프 기반 구조','라이브 세션 느낌','빈티지 테이프 질감','헤비 베이스라인','미니멀 어레인지먼트','오케스트라 스웰','글리치 효과','시네마틱 인트로','다이나믹 드롭'];
-const EXTRAS_EN = ['groove verse and chant-like chorus','call and response structure','dramatic key change','spoken word bridge','a cappella section','fade out ending','sudden stop ending','rhythmic repetition','ethereal reverb tail','layered harmonics','dramatic build-up','loop-based structure','live session feel','vintage tape texture','heavy bassline','minimal arrangement','orchestral swell','glitch effects','cinematic intro','dynamic drop'];
-
-
-// ─── 툴팁 설명 데이터 ───
-const REGION_DESC = {
-  '아시아':'한국·일본·인도 등 동아시아·남아시아의 다채로운 음악 스타일',
-  '유럽':'클래식부터 일렉트로닉까지, 유럽 각국의 독자적인 사운드',
-  '북미':'힙합·R&B·컨트리·재즈 등 세계 팝 음악의 중심지',
-  '남미':'삼바·탱고·레게톤 등 리듬감 넘치는 라틴 음악',
-  '아프리카':'아프로비트·하이라이프·아마피아노 등 대지의 에너지',
-  '오세아니아':'하와이·마오리 전통부터 인디팝까지 태평양 사운드',
-  '중동':'마캄·아랍팝·페르시안팝 등 신비로운 중동 선율',
-};
-
-const MOOD_DESC = {
-  '열정적인':'불타오르는 감정과 강렬한 에너지감',
-  '애수 어린':'가슴 한켠에 남는 쓸쓸하고 아련한 감성',
-  '황홀한':'기쁨과 흥분이 최고조에 달한 황홀경',
-  '어두운':'그림자와 긴장감이 감도는 어두운 분위기',
-  '향수 어린':'지나간 시절을 그리워하는 노스탤지어',
-  '따뜻한':'포근하고 안심되는 온기 있는 분위기',
-  '몽환적인':'현실과 꿈의 경계를 떠도는 환상적 느낌',
-  '공격적인':'강하고 직선적인 파워풀한 에너지',
-  '평화로운':'조용하고 고요한 안정감',
-  '신비로운':'알 수 없는 매력과 미지의 느낌',
-  '낭만적인':'사랑스럽고 감미로운 로맨틱한 감성',
-  '에너제틱한':'활기차고 넘치는 생동감',
-  '우울한':'무겁고 침울한 감정의 흐름',
-  '기쁜':'밝고 행복한 유쾌한 에너지',
-  '긴장감 있는':'숨막히는 서스펜스와 긴박함',
-  '차분한':'잔잔하고 절제된 성숙한 분위기',
-  '거칠고 날것의':'가공되지 않은 날것의 거친 에너지',
-  '웅장한':'스케일 크고 압도적인 장엄함',
-  '잔잔한':'물결처럼 부드럽고 조용히 흐르는 느낌',
-  '관능적인':'은근하고 매혹적인 감각적 분위기',
-  '순수한':'꾸밈없이 맑고 투명한 감성',
-  '외로운':'혼자라는 감정, 고독과 쓸쓸함',
-  '희망찬':'앞을 향해 나아가는 밝은 기대감',
-  '드라마틱한':'극적 반전과 고조가 있는 영화적 긴장',
-  '불안한':'불확실함과 초조함이 배어있는 감성',
-  '유쾌한':'장난기 넘치고 가볍게 즐거운 느낌',
-};
-
-const VOCAL_DESC = {
-  '남성 보컬':'낮고 중후한 남성의 목소리',
-  '여성 보컬':'섬세하고 맑은 여성의 목소리',
-  '듀엣':'남녀 또는 동성 두 보컬의 조화',
-  '합창':'여러 목소리가 어우러진 코러스',
-  '랩 보컬':'리드믹한 라임과 플로우 중심의 보컬',
-  '팔세토':'두성을 활용한 높고 가느다란 보컬',
-  '속삭이는 보컬':'귀에 속삭이듯 부드럽고 친밀한 보컬',
-  '열정적인 보컬':'감정을 터뜨리는 강렬하고 뜨거운 보컬',
-  '부드러운 보컬':'매끄럽고 유연하게 흐르는 편안한 보컬',
-  '거친 보컬':'허스키하고 그루브 있는 날것의 목소리',
-  '무보컬(연주곡)':'보컬 없이 악기만으로 구성된 순수 연주',
-  '소울풀한 보컬':'감정이 충만한 소울과 R&B 느낌의 보컬',
-  '오페라틱 보컬':'클래식 성악 기법이 적용된 웅장한 보컬',
-  '인디 보컬':'개성 있고 자연스러운 인디 감성의 목소리',
-  '그루브 보컬':'리듬을 타는 신체적 그루브감이 있는 보컬',
-  '알앤비 보컬':'멜리스마와 감성이 풍부한 R&B 창법',
-  '컨트리 보컬':'구수하고 진솔한 컨트리 음악 특유의 목소리',
-  '록 보컬':'에너지 넘치고 파워풀한 록 창법',
-  '팝 보컬':'깔끔하고 상업적으로 매력적인 팝 보컬',
-  '재즈 보컬':'즉흥성과 스윙이 담긴 재즈 창법',
-};
-
-const INSTR_BASE_DESC = {
-  '피아노':'88개의 건반, 클래식에서 팝까지 가장 범용적인 악기',
-  '기타':'6현 통기타, 따뜻하고 어쿠스틱한 사운드',
-  '베이스 기타':'저음역을 담당하는 일렉트릭 베이스',
-  '드럼':'킥·스네어·심벌로 이루어진 리듬의 중심',
-  '바이올린':'현악기 중 가장 높은 음역, 섬세하고 표현력 풍부',
-  '첼로':'깊고 풍부한 저중음역의 현악기',
-  '트럼펫':'화려하고 밝은 금관악기의 대표',
-  '색소폰':'재즈·블루스의 상징, 감성적인 목관악기',
-  '신디사이저':'전자 음향을 만들어내는 키보드 악기',
-  '일렉트릭 기타':'앰프와 이펙터로 다양한 사운드를 내는 전기 기타',
-  '어쿠스틱 기타':'앰프 없이 울리는 따뜻한 나무 기타',
-  '플루트':'맑고 청아한 고음역의 목관악기',
-  '오보에':'독특하고 코맹맹이 같은 따뜻한 목관악기',
-  '클라리넷':'부드럽고 따뜻한 음색의 목관악기',
-  '하프':'천상의 소리, 줄을 퉁겨 연주하는 현악기',
-  '비올라':'바이올린보다 깊고 따뜻한 중음역 현악기',
-  '더블베이스':'현악기 중 가장 낮은 음역의 대형 악기',
-  '밴조':'미국 민속·블루그래스의 상징적인 발현악기',
-  '만돌린':'이탈리아 기원의 소형 발현악기, 밝고 경쾌한 음색',
-  '우쿨렐레':'하와이 기원의 소형 4현 기타, 경쾌하고 따뜻함',
-  '하모니카':'입으로 불고 마시며 연주하는 소형 관악기',
-  '아코디언':'리드와 벨로우즈로 연주하는 버튼·건반 악기',
-  '멜로트론':'테이프 기반의 빈티지 키보드, 현악·합창 사운드',
-  '로즈 피아노':'전기 피아노, 따뜻하고 부드러운 재즈·소울 사운드',
-  '오르간':'파이프 또는 전기 방식의 웅장한 건반 악기',
-  '무그 신스':'아날로그 신스의 아버지, 두꺼운 따뜻한 음색',
-  '페달 스틸':'컨트리·하와이안 음악의 상징, 슬라이드 기타',
-  '현악 4중주':'바이올린 2·비올라·첼로의 클래식 앙상블',
-  '오케스트라 스트링스':'수십 명의 현악기 섹션, 웅장하고 풍성한 사운드',
-  '브라스 섹션':'트럼펫·트롬본·색소폰의 풍성한 관악 앙상블',
-};
-
-const EXTRAS_DESC = {
-  '그루브 벌스와 챈트 코러스':'벌스는 리드믹한 그루브로, 코러스는 함께 따라 부르기 쉬운 챈트로 구성',
-  '콜앤리스폰스 구조':'보컬이나 악기 간에 주고받는 대화형 구조',
-  '극적인 전조':'곡 중간 키가 갑자기 바뀌어 극적 효과를 주는 기법',
-  '스포큰 워드 브릿지':'노래 대신 말로 전달하는 내레이션 형식의 브릿지',
-  '아카펠라 구간':'악기 없이 목소리만으로 구성된 무반주 구간',
-  '점점 사라지는 엔딩':'볼륨이 서서히 줄어들며 자연스럽게 끝나는 페이드 아웃',
-  '갑작스러운 정지 엔딩':'예고 없이 갑자기 끝나는 강렬한 엔딩',
-  '리드믹 반복':'특정 리듬이나 구절이 반복되며 최면적 효과를 냄',
-  '에테리얼 리버브 테일':'긴 잔향으로 공간감과 몽환적인 여운을 줌',
-  '레이어드 하모닉스':'여러 음들이 겹쳐 풍부한 화성을 만들어내는 효과',
-  '드라마틱 빌드업':'점점 고조되어 절정으로 이르는 긴장감 있는 전개',
-  '루프 기반 구조':'반복되는 루프 패턴을 기반으로 한 구성',
-  '라이브 세션 느낌':'스튜디오가 아닌 실제 연주 현장의 생생한 느낌',
-  '빈티지 테이프 질감':'아날로그 테이프 특유의 따뜻하고 약간 흐린 음색',
-  '헤비 베이스라인':'묵직하게 존재감을 드러내는 강조된 저음',
-  '미니멀 어레인지먼트':'불필요한 요소를 걷어낸 간결하고 공간감 있는 편곡',
-  '오케스트라 스웰':'현악·금관이 함께 부풀어오르는 장엄한 크레셴도',
-  '글리치 효과':'디지털 오류처럼 끊기고 왜곡되는 실험적 사운드',
-  '시네마틱 인트로':'영화 오프닝처럼 분위기를 잡아주는 인상적인 인트로',
-  '다이나믹 드롭':'빌드업 이후 터지는 강렬한 드롭 구간',
-};
-
-const MODIFIER_DESC = {
-  '더 감성적으로':'감정의 강도와 표현력을 높이고 싶을 때',
-  '더 에너제틱하게':'템포와 활기를 끌어올려 더 역동적으로',
-  '더 시네마틱하게':'영화 음악처럼 스케일 있고 드라마틱하게',
-  '더 미니멀하게':'요소를 줄이고 공간감과 여백을 살리게',
-  '더 어둡게':'분위기를 더 어둡고 긴장감 있게',
-  '더 밝게':'밝고 경쾌한 방향으로',
-  '더 몽환적으로':'현실감을 줄이고 몽환적인 질감을 더하게',
-  '더 거칠게':'거칠고 날것의 에너지를 극대화',
-};
-
-// ─── 툴팁 헬퍼 ───
-function tip(label, desc) {
-  if (!desc) return `<button`;
-  return `<div class="tip-wrap"><button`;
-}
-function tipClose(desc) {
-  if (!desc) return '';
-  return `<span class="tooltip">${desc}</span></div>`;
-}
-
-// 버튼 + 툴팁을 한번에 생성하는 헬퍼
-function makeBtn(cls, onclick, label, desc) {
-  if (desc) {
-    return `<div class="tip-wrap"><button class="${cls}" ${onclick}>${label}</button><span class="tooltip">${desc}</span></div>`;
-  }
-  return `<button class="${cls}" ${onclick}>${label}</button>`;
-}
-
-const STORIES_KO = [
-  {id:'chase', label:'꿈을 향한 질주', en:'chasing dreams with the reckless heart of youth',       desc:'젊음의 무모함으로 꿈을 향해 달려가는 이야기'},
-  {id:'loss',  label:'이별 후의 밤',   en:'the quiet heartbreak after goodbye',                    desc:'이별 이후 홀로 맞이하는 조용하고 아픈 밤'},
-  {id:'city',  label:'도시의 불빛',    en:'lost in the neon glow of a midnight city',              desc:'자정의 도시 네온 불빛 속에 길을 잃은 감성'},
-  {id:'rise',  label:'역경을 넘어',    en:'rising from the ashes of a broken past',                desc:'부서진 과거를 딛고 다시 일어서는 이야기'},
-  {id:'love',  label:'첫사랑의 기억',  en:'the bittersweet memory of first love',                  desc:'달콤하고도 쓴 첫사랑의 기억'},
-  {id:'free',  label:'자유를 향해',    en:'running toward the horizon of endless freedom',         desc:'끝없는 자유의 지평선을 향해 달리는 이야기'},
-  {id:'alone', label:'혼자만의 시간',  en:'finding peace in the solitude of being alone',          desc:'고독 속에서 찾아내는 평화와 나만의 시간'},
-  {id:'war',   label:'전쟁과 생존',    en:'surviving the chaos of a world on fire',                desc:'불타는 세상에서 살아남으려는 처절한 이야기'},
-  {id:'nature',label:'자연의 품으로',  en:'returning to the raw beauty of the natural world',      desc:'자연의 날것 그대로의 아름다움으로 돌아가는 여정'},
-  {id:'night', label:'새벽의 감성',    en:'drifting through the quiet hours before dawn',          desc:'새벽 여명 전 고요한 시간을 떠도는 몽상'},
-  {id:'dance', label:'춤추는 밤',      en:'losing yourself on the dance floor under flashing lights',desc:'화려한 조명 아래 자신을 잃고 춤추는 밤'},
-  {id:'road',  label:'로드트립',       en:'chasing the open road with nowhere to be',              desc:'목적지 없이 열린 도로를 달리는 자유로운 여행'},
-  {id:'ghost', label:'사라진 것들',    en:'haunted by the ghosts of what could have been',         desc:'있었을 수도 있는 것들의 유령에 홀린 감성'},
-  {id:'home',  label:'고향의 그리움',  en:'longing for the warmth of a home left behind',          desc:'떠나온 고향의 따뜻함을 그리워하는 마음'},
-  {id:'rise2', label:'나의 전성기',    en:'standing at the peak of power and glory',               desc:'권력과 영광의 정점에 서있는 순간'},
-  {id:'rain',  label:'빗속의 고독',    en:'wandering alone in the rain with nowhere to go',        desc:'갈 곳 없이 빗속을 혼자 걷는 고독'},
-  {id:'custom',label:'직접 입력',      en:'',                                                      desc:'원하는 스토리를 직접 영문으로 입력'},
-];
-
-const BPM_PRESETS = [
-  {ko:'감성 발라드', bpm:65, desc:'느리고 깊은 감정'},
-  {ko:'느린 R&B',   bpm:75, desc:'무거운 그루브'},
-  {ko:'R&B / 힙합', bpm:86, desc:'그루브 중심'},
-  {ko:'미드 그루브', bpm:92, desc:'자연스러운 흐름'},
-  {ko:'인디 팝',    bpm:98, desc:'산뜻한 중간 템포'},
-  {ko:'팝',         bpm:104,desc:'메인스트림 흐름'},
-  {ko:'업비트 팝',  bpm:112,desc:'경쾌한 에너지'},
-  {ko:'EDM / 댄스', bpm:120,desc:'추진감 있는 전개'},
-  {ko:'하우스',     bpm:128,desc:'클럽 친화적 에너지'},
-  {ko:'트랩',       bpm:140,desc:'강한 드롭과 펀치감'},
-  {ko:'드럼앤베이스',bpm:160,desc:'매우 빠른 질주감'},
-  {ko:'정글',       bpm:170,desc:'극한의 속도'},
-];
-
-const MODIFIERS_KO = ['더 감성적으로','더 에너제틱하게','더 시네마틱하게','더 미니멀하게','더 어둡게','더 밝게','더 몽환적으로','더 거칠게'];
-const MODIFIERS_EN = ['more emotional','more energetic','more cinematic','more minimal','darker','brighter','more dreamy','more raw and gritty'];
-
-const TAB_NAMES = ['스타일','스토리','분위기','템포','악기','보컬','기타'];
-
-// ─── 곡 구조 템플릿 (장르별 표준 기승전결, Suno Lyrics 태그용) ───
-const SONG_FORMS = [
-  {name:'K-Pop 댄스',  desc:'후렴 반복과 댄스 브레이크가 있는 팝 댄스 구조', tags:['Intro','Verse 1','Verse 2','Chorus','Dance Beat Break','Bridge','Chorus','Outro']},
-  {name:'힙합 / R&B',  desc:'비트 드랍과 훅 반복 중심의 힙합/R&B 구조',       tags:['Intro','Beat Drop','Rap Verse 1','Hook','Rap Verse 2','Hook','Outro']},
-  {name:'시티팝',      desc:'연주 솔로가 들어간 세련된 시티팝 구조',         tags:['Intro','Verse 1','Verse 2','Chorus','Instrumental Solo','Bridge','Chorus','Outro']},
-  {name:'발라드',      desc:'벌스가 하나 더 있는 감정 고조형 발라드 구조',   tags:['Intro','Verse 1','Verse 2','Chorus','Verse 3','Bridge','Chorus','Outro']},
-  {name:'모던 록',      desc:'기타 솔로가 들어간 정통 모던 록 구조',         tags:['Intro','Verse 1','Verse 2','Chorus','Guitar Solo','Bridge','Chorus','Outro']},
-];
-
-// ─── STATE ───
-let S = {
-  tab:0, region:null, country:null, genre:null,
-  stories:[], moods:[], bpm:107, bpmPreset:null, bpmTouched:false,
-  instruments:[], vocal:null, customStory:'',
-  extras:[], modifiers:[], copied:false,
-  songForm:null, songFormCopied:false,
-};
-
-// ─── PROMPT BUILDER (영문 출력) ───
-function buildPrompt(mods=[]) {
-  const parts = [];
-  if (S.genre) parts.push(GENRE_EN[S.genre] || S.genre);
-  S.moods.forEach(m => { const i=MOODS_KO.indexOf(m); parts.push(i>=0?MOODS_EN[i]:m); });
-  if (S.bpm) parts.push(S.bpm + ' BPM');
-  S.instruments.forEach(inst => {
-    const bi = INSTR_BASE_KO.indexOf(inst);
-    if (bi>=0) { parts.push(INSTR_BASE_EN[bi]); return; }
-    const genre = Object.keys(INSTR_BY_GENRE_KO).find(g => INSTR_BY_GENRE_KO[g].includes(inst));
-    if (genre) { const gi=INSTR_BY_GENRE_KO[genre].indexOf(inst); parts.push(INSTR_BY_GENRE_EN[genre][gi]); return; }
-    parts.push(inst);
-  });
-  if (S.vocal) { const vi=VOCALS_KO.indexOf(S.vocal); parts.push(vi>=0?VOCALS_EN[vi]:S.vocal); }
-  S.stories.forEach(id => {
-    const st = STORIES_KO.find(x=>x.id===id);
-    const val = st?.id==='custom' ? S.customStory : st?.en;
-    if (val) parts.push('about ' + val);
-  });
-  S.extras.forEach(e => { const ei=EXTRAS_KO.indexOf(e); parts.push(ei>=0?EXTRAS_EN[ei]:e); });
-  if (mods.length) mods.forEach(m => { const mi=MODIFIERS_KO.indexOf(m); if(mi>=0) parts.push(MODIFIERS_EN[mi]); });
-  return parts.join(', ');
-}
-
-function getStatus() {
-  const filled = [S.genre,S.moods.length,S.bpm,S.instruments.length,S.vocal].filter(Boolean).length;
-  if (filled===0) return {type:'empty',msg:'왼쪽 패널에서 항목을 선택하면 영문 프롬프트가 생성됩니다.'};
-  if (S.moods.length===1) return {type:'warn',msg:'무드를 2개 이상 고르면 더 자연스러운 프롬프트가 됩니다.'};
-  if (filled>=4) return {type:'ok',msg:'현재 조합은 비교적 안정적입니다.'};
-  return {type:'warn',msg:'더 많은 항목을 선택할수록 풍부한 프롬프트가 완성됩니다.'};
-}
-
-function isDone(i) {
-  return [!!S.genre,S.stories.length>0,S.moods.length>0,S.bpmTouched,S.instruments.length>0,!!S.vocal,S.extras.length>0][i];
-}
-
-// ─── RENDER ───
-function renderTabs() {
-  document.getElementById('tabStrip').innerHTML = TAB_NAMES.map((n,i)=>{
-    const cls=S.tab===i?'tab active':isDone(i)?'tab done':'tab';
-    return `<button class="${cls}" onclick="setTab(${i})"><span class="check">✓</span>${i+1} ${n}</button>`;
-  }).join('');
-}
-
-function renderLeft() {
-  let html = `<div class="panel-title">${TAB_NAMES[S.tab]}</div>`;
-  const t = S.tab;
-
-  if (t===0) {
-    const countries = S.region?(COUNTRIES[S.region]||[]):[];
-    const genres = S.country?(GENRES[S.country]||[]):[];
-    html += `<div class="section-label">1. 지역 선택</div><div class="btn-grid">
-      ${REGIONS.map(r=>makeBtn(`sel-btn ${S.region===r?'selected':''}`,`onclick="setRegion('${r}')"`,r,REGION_DESC[r]||'')).join('')}
-    </div>
-    <div class="section-label">2. 국가 선택</div><div class="btn-grid">
-      ${S.region?countries.map(c=>`<button class="sel-btn ${S.country===c?'selected':''}" onclick="setCountry('${c}')">${c}</button>`).join(''):'<span style="font-size:12px;color:var(--text3)">지역을 먼저 선택하세요</span>'}
-    </div>
-    <div class="section-label">3. 장르 선택</div><div class="btn-grid">
-      ${S.country?genres.map(g=>`<button class="sel-btn ${S.genre===g?'selected':''}" onclick="setGenre('${r(g)}')">${g}</button>`).join(''):'<span style="font-size:12px;color:var(--text3)">국가를 먼저 선택하세요</span>'}
-    </div>`;
-  } else if (t===1) {
-    html += `<div class="section-label">스토리 테마 (복수 선택)</div><div class="btn-grid">
-      ${STORIES_KO.map(s=>makeBtn(`sel-btn ${S.stories.includes(s.id)?'selected':''}`,`onclick="toggleStory('${s.id}')"`,s.label,s.desc||'')).join('')}
-    </div>
-    ${S.stories.includes('custom')?`<div class="section-label" style="margin-top:14px">직접 입력 (영문 권장)</div>
-      <textarea class="text-inp" placeholder="e.g. a journey through forgotten memories" oninput="setCustom(this.value)">${S.customStory}</textarea>`:''}`;
-  } else if (t===2) {
-    html += `<div class="section-label">분위기 (복수 선택)</div><div class="btn-grid">
-      ${MOODS_KO.map(m=>makeBtn(`sel-btn ${S.moods.includes(m)?'selected':''}`,`onclick="toggleMood('${m}')"`,m,MOOD_DESC[m]||'')).join('')}
-    </div>`;
-  } else if (t===3) {
-    html += `<div class="bpm-display">${S.bpm}<span>BPM</span></div>
-    <input type="range" class="bpm-slider" min="40" max="200" step="1" value="${S.bpm}" oninput="setBpm(+this.value)">
-    <div class="bpm-input-row">
-      <input type="number" class="bpm-num" min="40" max="200" value="${S.bpm}" oninput="setBpm(Math.min(200,Math.max(40,+this.value||107)))">
-      <span class="bpm-hint">직접 입력 가능</span>
-    </div>
-    <div class="preset-grid">
-      ${BPM_PRESETS.map((p,i)=>`<div class="preset-card ${S.bpmPreset===i?'selected':''}" onclick="setBpmPreset(${i},${p.bpm})">
-        <div class="preset-name">${p.ko}</div>
-        <div class="preset-bpm">${p.bpm} BPM</div>
-        <div class="preset-desc">${p.desc}</div>
-      </div>`).join('')}
-    </div>`;
-  } else if (t===4) {
-    const genreKey = S.genre && INSTR_BY_GENRE_KO[S.genre] ? S.genre : null;
-    const extra = genreKey ? INSTR_BY_GENRE_KO[genreKey] : [];
-    const all = [...new Set([...extra, ...INSTR_BASE_KO])];
-    html += (extra.length?`<div class="genre-hint">✦ ${S.genre} 추천 악기 포함</div>`:'') +
-      `<div class="section-label">악기 (복수 선택)</div><div class="btn-grid">
-        ${all.map(inst=>{ const desc=INSTR_BASE_DESC[inst]||''; const cls=`sel-btn ${S.instruments.includes(inst)?'selected':''}`; const att=`onclick="toggleInstByEl(this)" data-val="${inst}"`; return makeBtn(cls,att,inst,desc); }).join('')}
-      </div>`;
-  } else if (t===5) {
-    html += `<div class="section-label">보컬 스타일</div><div class="btn-grid">
-      ${VOCALS_KO.map((v,i)=>makeBtn(`sel-btn ${S.vocal===v?'selected':''}`,`onclick="setVocalIdx(${i})"`,v,VOCAL_DESC[v]||'')).join('')}
-    </div>`;
-  } else if (t===6) {
-    html += `<div class="section-label">기타 사항 (복수 선택)</div><div class="btn-grid">
-      ${EXTRAS_KO.map((e,i)=>makeBtn(`sel-btn ${S.extras.includes(e)?'selected':''}`,`onclick="toggleExtraIdx(${i})"`,e,EXTRAS_DESC[e]||'')).join('')}
-    </div>`;
+  const $ = (id) => document.getElementById(id);
+  const logEl = $('statusLog');
+  function log(msg, cls){
+    const line = document.createElement('div');
+    if(cls) line.className = cls;
+    line.textContent = '· ' + msg;
+    logEl.appendChild(line);
+    logEl.scrollTop = logEl.scrollHeight;
   }
 
-  html += `<div class="reset-row"><button class="reset-btn" onclick="resetTab()">초기화</button></div>`;
-  document.getElementById('leftPanel').innerHTML = html;
-}
+  // ================= Progress bar / chunked-work helper =================
+  function yieldUI(){ return new Promise(r=>setTimeout(r,0)); }
+  function setProgress(pct, label){
+    $('progressWrap').style.display = 'block';
+    $('progressBar').style.width = Math.max(0,Math.min(100,pct)) + '%';
+    if(label!==undefined) $('progressLabel').textContent = label;
+  }
+  function hideProgress(){
+    $('progressWrap').style.display = 'none';
+    $('progressLabel').textContent = '';
+  }
 
-function renderMid() {
-  const st = getStatus();
-  const storyText = S.stories.map(id=>{
-    const s=STORIES_KO.find(x=>x.id===id);
-    return s?.id==='custom'?S.customStory||'...':s?.label;
-  }).filter(Boolean).join(', ')||'-';
+  function getAudioCtx(){
+    if(!state.audioCtx){
+      state.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    return state.audioCtx;
+  }
 
-  const rows = [
-    {k:'스타일', v:[S.region,S.country,S.genre].filter(Boolean).join(' › ')||'-'},
-    {k:'스토리', v:storyText},
-    {k:'분위기', v:S.moods.join(', ')||'-'},
-    {k:'템포',   v:S.bpm+' BPM', bpm:true},
-    {k:'악기',   v:S.instruments.join(', ')||'-'},
-    {k:'보컬',   v:S.vocal||'-'},
-    {k:'기타',   v:S.extras.join(', ')||'-'},
-  ];
+  // ================= Biquad filter (RBJ cookbook) =================
+  function makeBiquad(type, fs, f0, gainDb, Q){
+    const A = Math.pow(10, gainDb/40);
+    const w0 = 2*Math.PI*f0/fs;
+    const cosw0 = Math.cos(w0), sinw0 = Math.sin(w0);
+    const alpha = sinw0/(2*Q);
+    let b0,b1,b2,a0,a1,a2;
 
-  document.getElementById('midPanel').innerHTML = `
-    <div class="mid-header">
-      <div class="panel-title" style="margin:0">선택 요약</div>
-      <button class="save-btn" onclick="saveCSV()">↓ CSV 저장</button>
-    </div>
-    <div class="status-badge status-${st.type}">${st.msg}</div>
-    ${rows.map(r=>`<div class="sum-row">
-      <div class="sum-key">${r.k}</div>
-      <div class="sum-val ${r.v==='-'?'empty':''} ${r.bpm?'bpm':''}">${r.v}</div>
-    </div>`).join('')}`;
-}
+    if(type === 'lowshelf'){
+      const sqrtA = Math.sqrt(A);
+      b0 =    A*((A+1) - (A-1)*cosw0 + 2*sqrtA*alpha);
+      b1 =  2*A*((A-1) - (A+1)*cosw0);
+      b2 =    A*((A+1) - (A-1)*cosw0 - 2*sqrtA*alpha);
+      a0 =        (A+1) + (A-1)*cosw0 + 2*sqrtA*alpha;
+      a1 =   -2*((A-1) + (A+1)*cosw0);
+      a2 =        (A+1) + (A-1)*cosw0 - 2*sqrtA*alpha;
+    } else if(type === 'highshelf'){
+      const sqrtA = Math.sqrt(A);
+      b0 =    A*((A+1) + (A-1)*cosw0 + 2*sqrtA*alpha);
+      b1 = -2*A*((A-1) + (A+1)*cosw0);
+      b2 =    A*((A+1) + (A-1)*cosw0 - 2*sqrtA*alpha);
+      a0 =        (A+1) - (A-1)*cosw0 + 2*sqrtA*alpha;
+      a1 =    2*((A-1) - (A+1)*cosw0);
+      a2 =        (A+1) - (A-1)*cosw0 - 2*sqrtA*alpha;
+    } else if(type === 'peaking'){
+      b0 = 1 + alpha*A;
+      b1 = -2*cosw0;
+      b2 = 1 - alpha*A;
+      a0 = 1 + alpha/A;
+      a1 = -2*cosw0;
+      a2 = 1 - alpha/A;
+    } else if(type === 'highpass'){
+      b0 = (1+cosw0)/2;
+      b1 = -(1+cosw0);
+      b2 = (1+cosw0)/2;
+      a0 = 1+alpha;
+      a1 = -2*cosw0;
+      a2 = 1-alpha;
+    } else { // allpass fallback
+      b0=1;b1=0;b2=0;a0=1;a1=0;a2=0;
+    }
+    return {
+      b0:b0/a0, b1:b1/a0, b2:b2/a0, a1:a1/a0, a2:a2/a0,
+      x1:0, x2:0, y1:0, y2:0
+    };
+  }
 
-function renderRight() {
-  const prompt = buildPrompt();
-  const modPrompt = S.modifiers.length ? buildPrompt(S.modifiers) : '';
-  const display = modPrompt || prompt;
-  const charCount = display.length;
+  function runBiquad(coef, data){
+    const out = new Float32Array(data.length);
+    let x1=coef.x1, x2=coef.x2, y1=coef.y1, y2=coef.y2;
+    const b0=coef.b0, b1=coef.b1, b2=coef.b2, a1=coef.a1, a2=coef.a2;
+    for(let i=0;i<data.length;i++){
+      const x0 = data[i];
+      const y0 = b0*x0 + b1*x1 + b2*x2 - a1*y1 - a2*y2;
+      out[i] = y0;
+      x2=x1; x1=x0; y2=y1; y1=y0;
+    }
+    coef.x1=x1; coef.x2=x2; coef.y1=y1; coef.y2=y2;
+    return out;
+  }
 
-  document.getElementById('rightPanel').innerHTML = `
-    <div class="mid-header">
-      <div class="panel-title" style="margin:0">전체 프롬프트 (영문)</div>
-    </div>
-    <div class="prompt-box ${prompt?'':'empty'}">${prompt||'선택 항목이 없습니다.'}</div>
-    <div class="char-count"><span class="${charCount>200?'over':''}">${charCount}</span> / 200자</div>
-    <button class="copy-btn ${S.copied?'copied':''}" onclick="copyPrompt()">${S.copied?'✓ 복사됨':'클립보드 저장'}</button>
-    <div class="mod-title">변형 프롬프트</div>
-    <div class="mod-grid">
-      ${MODIFIERS_KO.map((m,i)=>makeBtn(`mod-btn ${S.modifiers.includes(m)?'active':''}`,`onclick="toggleModIdx(${i})"`,m,MODIFIER_DESC[m]||'')).join('')}
-    </div>
-    ${modPrompt?`<div class="mod-result">${modPrompt}</div>`:''}
-    <div class="mod-title" style="margin-top:18px">곡 구조 템플릿 (Lyrics 태그)</div>
-    <div class="mod-grid">
-      ${SONG_FORMS.map((f,i)=>makeBtn(`mod-btn ${S.songForm===i?'active':''}`,`onclick="setSongForm(${i})"`,f.name,f.desc)).join('')}
-    </div>
-    ${S.songForm!==null?`<div class="mod-result" style="white-space:pre-line">${SONG_FORMS[S.songForm].tags.map(t=>'['+t+']').join('\n\n')}</div>
-    <button class="copy-btn ${S.songFormCopied?'copied':''}" style="margin-top:8px" onclick="copySongForm()">${S.songFormCopied?'✓ 복사됨':'구조 태그 복사'}</button>`:''}`;
-}
+  // ================= BS.1770-ish LUFS measurement =================
+  function measureLUFS(channels, fs){
+    // K-weighting: highpass + high shelf (standard BS.1770 constants)
+    const weighted = channels.map(ch => {
+      const hp = makeBiquad('highpass', fs, 38.13547087613982, 0, 0.5003270373238773);
+      let out = runBiquad(hp, ch);
+      const shelf = makeBiquad('highshelf', fs, 1681.9744509555319, 3.99984385397, 0.7071752369554193);
+      out = runBiquad(shelf, out);
+      return out;
+    });
 
-function render() { renderTabs(); renderLeft(); renderMid(); renderRight(); }
+    const blockSize = Math.round(0.4*fs);
+    const hop = Math.round(0.1*fs); // 75% overlap
+    const n = weighted[0].length;
+    const blockLoudness = [];
+    for(let start=0; start+blockSize<=n; start+=hop){
+      let sumSq = 0;
+      for(let c=0;c<weighted.length;c++){
+        const ch = weighted[c];
+        let s=0;
+        for(let i=start;i<start+blockSize;i++){ s += ch[i]*ch[i]; }
+        sumSq += s/blockSize;
+      }
+      const l = -0.691 + 10*Math.log10(sumSq + 1e-12);
+      blockLoudness.push({l, sumSq});
+    }
+    if(blockLoudness.length===0) return -70;
 
-// ─── 특수문자 이스케이프 ───
-function r(s){ return s.replace(/'/g,"\\'"); }
+    // absolute gate -70 LUFS
+    const gated1 = blockLoudness.filter(b => b.l > -70);
+    if(gated1.length===0) return -70;
+    const avgSq1 = gated1.reduce((a,b)=>a+b.sumSq,0)/gated1.length;
+    const relThresh = -0.691 + 10*Math.log10(avgSq1+1e-12) - 10;
 
-// ─── HANDLERS ───
-function setTab(i){S.tab=i;render();}
-function setRegion(v){S.region=v;S.country=null;S.genre=null;render();}
-function setCountry(v){S.country=v;S.genre=null;render();}
-function setGenre(v){S.genre=v;render();}
-function toggleStory(id){S.stories=S.stories.includes(id)?S.stories.filter(x=>x!==id):[...S.stories,id];render();}
-function setCustom(v){S.customStory=v;}
-function toggleMood(m){S.moods=S.moods.includes(m)?S.moods.filter(x=>x!==m):[...S.moods,m];render();}
-function setBpm(v){S.bpm=v;S.bpmPreset=null;S.bpmTouched=true;render();}
-function setBpmPreset(i,bpm){S.bpm=bpm;S.bpmPreset=i;S.bpmTouched=true;render();}
-function toggleInstByEl(el){const inst=el.dataset.val;S.instruments=S.instruments.includes(inst)?S.instruments.filter(x=>x!==inst):[...S.instruments,inst];render();}
-function toggleInst(inst){S.instruments=S.instruments.includes(inst)?S.instruments.filter(x=>x!==inst):[...S.instruments,inst];render();}
-function toggleInstIdx(idx, val){toggleInst(val||'');}
-function setVocal(v){S.vocal=v;render();}
-function setVocalIdx(i){S.vocal=VOCALS_KO[i];render();}
-function toggleExtra(e){S.extras=S.extras.includes(e)?S.extras.filter(x=>x!==e):[...S.extras,e];render();}
-function toggleExtraIdx(i){toggleExtra(EXTRAS_KO[i]);}
-function toggleMod(m){S.modifiers=S.modifiers.includes(m)?S.modifiers.filter(x=>x!==m):[...S.modifiers,m];render();}
-function toggleModIdx(i){toggleMod(MODIFIERS_KO[i]);}
-function setSongForm(i){S.songForm=S.songForm===i?null:i;S.songFormCopied=false;render();}
-function copySongForm(){
-  if(S.songForm===null)return;
-  const text=SONG_FORMS[S.songForm].tags.map(t=>'['+t+']').join('\n\n');
-  navigator.clipboard.writeText(text).then(()=>{
-    S.songFormCopied=true;render();
-    setTimeout(()=>{S.songFormCopied=false;render();},2000);
+    const gated2 = gated1.filter(b => b.l > relThresh);
+    const useSet = gated2.length>0 ? gated2 : gated1;
+    const avgSq2 = useSet.reduce((a,b)=>a+b.sumSq,0)/useSet.length;
+    return -0.691 + 10*Math.log10(avgSq2 + 1e-12);
+  }
+
+  function measurePeakDb(channels){
+    let peak=0;
+    for(const ch of channels){
+      for(let i=0;i<ch.length;i++){
+        const a = Math.abs(ch[i]);
+        if(a>peak) peak=a;
+      }
+    }
+    return 20*Math.log10(peak+1e-12);
+  }
+
+  // ================= True-peak (dBTP) via 4x polyphase oversampling =================
+  // Sample peak alone misses inter-sample overs that appear after D/A reconstruction.
+  // We approximate ITU-R BS.1770 true-peak by reconstructing the signal at 4x rate
+  // through a windowed-sinc lowpass and taking the max of the reconstructed points.
+  const TP_OVERSAMPLE = 4;
+  const TP_TAPS = 25;
+  let tpPolyphaseCache = null;
+  function designLowpassFIR(numTaps, cutoff){
+    const taps = new Float32Array(numTaps);
+    const M = numTaps-1;
+    for(let n=0;n<numTaps;n++){
+      const x = n - M/2;
+      const h = (x===0) ? cutoff : Math.sin(Math.PI*cutoff*x)/(Math.PI*x);
+      const w = 0.42 - 0.5*Math.cos(2*Math.PI*n/M) + 0.08*Math.cos(4*Math.PI*n/M); // Blackman window
+      taps[n] = h*w;
+    }
+    return taps;
+  }
+  function getTruePeakFilters(){
+    if(tpPolyphaseCache) return tpPolyphaseCache;
+    const h = designLowpassFIR(TP_TAPS, 1/TP_OVERSAMPLE);
+    let sum=0; for(let i=0;i<TP_TAPS;i++) sum+=h[i];
+    const scale = TP_OVERSAMPLE/sum; // restore DC gain lost to zero-stuffing
+    for(let i=0;i<TP_TAPS;i++) h[i]*=scale;
+    const sub = [];
+    for(let p=0;p<TP_OVERSAMPLE;p++){
+      const arr = [];
+      for(let t=0; p+TP_OVERSAMPLE*t < TP_TAPS; t++) arr.push(h[p+TP_OVERSAMPLE*t]);
+      sub.push(new Float32Array(arr));
+    }
+    tpPolyphaseCache = sub;
+    return sub;
+  }
+  // Synchronous true-peak (used for quick on-load metering)
+  function measureTruePeakDb(channels){
+    const sub = getTruePeakFilters();
+    let peak = 0;
+    for(const x of channels){
+      for(let p=0;p<sub.length;p++){
+        const g = sub[p], L = g.length;
+        for(let m=0;m<x.length;m++){
+          let acc=0;
+          for(let t=0;t<L;t++){ const idx=m-t; if(idx>=0) acc += g[t]*x[idx]; }
+          const a = Math.abs(acc);
+          if(a>peak) peak=a;
+        }
+      }
+    }
+    return 20*Math.log10(peak+1e-12);
+  }
+  // Chunked/async true-peak (used in the main pipeline so the UI can show progress)
+  async function measureTruePeakDbAsync(channels, onProgress){
+    const sub = getTruePeakFilters();
+    let peak = 0;
+    const totalWork = channels.length * sub.length;
+    let done = 0;
+    for(const x of channels){
+      for(let p=0;p<sub.length;p++){
+        const g = sub[p], L = g.length;
+        for(let m=0;m<x.length;m++){
+          let acc=0;
+          for(let t=0;t<L;t++){ const idx=m-t; if(idx>=0) acc += g[t]*x[idx]; }
+          const a = Math.abs(acc);
+          if(a>peak) peak=a;
+          if((m & 32767)===0) await yieldUI();
+        }
+        done++;
+        if(onProgress) onProgress(done/totalWork);
+      }
+    }
+    return 20*Math.log10(peak+1e-12);
+  }
+
+  // ================= VU needle meter =================
+  const vuCanvas = $('vuCanvas');
+  const vuCtx = vuCanvas.getContext('2d');
+  function drawVU(lufs){
+    const w = vuCanvas.width, h = vuCanvas.height;
+    vuCtx.clearRect(0,0,w,h);
+    const cx = w/2, cy = h-18, r = h-40;
+
+    // arc zones: -30(left) to 0(right) mapped to -130deg..-50deg
+    const minL=-30, maxL=0;
+    const angFor = (val) => {
+      const t = Math.max(0, Math.min(1, (val-minL)/(maxL-minL)));
+      return Math.PI*1.0 + Math.PI*(1-t); // 180deg to 0deg sweep (upper half)
+    };
+
+    function arc(a1,a2,color,lw){
+      vuCtx.beginPath();
+      vuCtx.strokeStyle = color; vuCtx.lineWidth = lw;
+      vuCtx.arc(cx,cy,r,a1,a2,false);
+      vuCtx.stroke();
+    }
+    // background track
+    arc(Math.PI, 0, '#2c313a', 10);
+    // quiet zone (< -18)
+    arc(angFor(minL), angFor(-18), '#3a5578', 10);
+    // target zone (-16 to -8)
+    arc(angFor(-16), angFor(-8), '#3d6b4a', 10);
+    // hot zone (> -8)
+    arc(angFor(-8), angFor(maxL), '#7a3336', 10);
+
+    // ticks
+    vuCtx.fillStyle = '#8b909c';
+    vuCtx.font = '10px monospace';
+    [-30,-24,-18,-14,-10,-6,0].forEach(v=>{
+      const a = angFor(v);
+      const tx = cx + Math.cos(a)*(r+14);
+      const ty = cy + Math.sin(a)*(r+14);
+      vuCtx.textAlign='center';
+      vuCtx.fillText(String(v), tx, ty+3);
+    });
+
+    // needle
+    const val = (lufs===null || isNaN(lufs)) ? -30 : lufs;
+    const a = angFor(val);
+    vuCtx.save();
+    vuCtx.translate(cx,cy);
+    vuCtx.rotate(a);
+    vuCtx.beginPath();
+    vuCtx.moveTo(0,0);
+    vuCtx.lineTo(r-6,0);
+    vuCtx.strokeStyle = '#e8a33d';
+    vuCtx.lineWidth = 2.4;
+    vuCtx.shadowColor = '#e8a33d';
+    vuCtx.shadowBlur = 6;
+    vuCtx.stroke();
+    vuCtx.restore();
+
+    // hub
+    vuCtx.beginPath();
+    vuCtx.arc(cx,cy,5,0,Math.PI*2);
+    vuCtx.fillStyle = '#e8a33d';
+    vuCtx.fill();
+
+    vuCtx.textAlign='center';
+    vuCtx.fillStyle = '#edeae3';
+    vuCtx.font = 'bold 13px monospace';
+    vuCtx.fillText((lufs===null||isNaN(lufs)) ? '— LUFS' : (lufs.toFixed(1)+' LUFS'), cx, cy-14);
+  }
+  drawVU(null);
+
+  // ================= Waveform drawing: overlay + diff comparison =================
+  const waveCanvas = $('waveCanvas');
+  const waveCtx = waveCanvas.getContext('2d');
+  let lastDiffScale = 1; // auto-computed each diff draw, shown in the legend
+
+  function computeColumns(data, w){
+    const cols = new Array(w);
+    const step = Math.max(1, Math.ceil(data.length / w));
+    for(let x=0; x<w; x++){
+      let min=1, max=-1;
+      const start = x*step;
+      for(let i=0;i<step;i++){
+        const idx = start+i;
+        if(idx>=data.length) break;
+        const v = data[idx];
+        if(v<min) min=v;
+        if(v>max) max=v;
+      }
+      if(min>max){ min=0; max=0; }
+      cols[x] = {min,max};
+    }
+    return cols;
+  }
+
+  function drawEnvelope(cols, w, h, mid, fillColor){
+    waveCtx.beginPath();
+    for(let x=0;x<w;x++){
+      const y = mid + cols[x].max*mid*0.9;
+      if(x===0) waveCtx.moveTo(x,y); else waveCtx.lineTo(x,y);
+    }
+    for(let x=w-1;x>=0;x--) waveCtx.lineTo(x, mid + cols[x].min*mid*0.9);
+    waveCtx.closePath();
+    waveCtx.fillStyle = fillColor;
+    waveCtx.fill();
+  }
+
+  // Draws original (gray) and processed (amber) waveforms overlaid on the
+  // same axis so the ear-level difference between them is visible at a
+  // glance, or — in diff mode — the sample-wise delta amplified for clarity.
+  function drawWaveformCompare(origData, procData, mode){
+    const w = waveCanvas.width, h = waveCanvas.height;
+    waveCtx.clearRect(0,0,w,h);
+    waveCtx.fillStyle = '#101215';
+    waveCtx.fillRect(0,0,w,h);
+    const mid = h/2;
+
+    if(mode==='diff' && origData && procData){
+      const len = Math.min(origData.length, procData.length);
+      const raw = new Float32Array(len);
+      let maxAbs = 0;
+      for(let i=0;i<len;i++){
+        const d = procData[i]-origData[i];
+        raw[i] = d;
+        const a = Math.abs(d);
+        if(a>maxAbs) maxAbs = a;
+      }
+      // auto-scale so the biggest difference fills ~90% of the canvas —
+      // a fixed multiplier would clip solid whenever there's a large
+      // overall gain change (the most common "difference" of all).
+      lastDiffScale = maxAbs>1e-6 ? Math.min(50, 0.9/maxAbs) : 1;
+      const diff = new Float32Array(len);
+      for(let i=0;i<len;i++) diff[i] = raw[i]*lastDiffScale;
+      drawEnvelope(computeColumns(diff, w), w, h, mid, 'rgba(229,72,77,0.8)');
+      return;
+    }
+    if(origData) drawEnvelope(computeColumns(origData, w), w, h, mid, 'rgba(107,114,128,0.55)');
+    if(procData) drawEnvelope(computeColumns(procData, w), w, h, mid, 'rgba(232,163,61,0.65)');
+  }
+
+  function updateWaveLegend(){
+    const el = $('waveLegend');
+    if(state.waveMode==='diff'){
+      el.innerHTML = '<span class="legendItem"><span class="swatch" style="background:rgba(229,72,77,0.9)"></span>차이 파형 (원본 대비, 약 '+lastDiffScale.toFixed(1)+'배 확대해 표시)</span>';
+    } else {
+      el.innerHTML =
+        '<span class="legendItem"><span class="swatch" style="background:rgba(107,114,128,0.9)"></span>원본 (A)</span>'+
+        '<span class="legendItem"><span class="swatch" style="background:rgba(232,163,61,0.9)"></span>마스터링 (B)</span>';
+    }
+  }
+
+  function refreshWaveform(){
+    const origData = state.originalBuffer ? state.originalBuffer.getChannelData(0) : null;
+    const procData = state.processedChannels ? state.processedChannels[0] : null;
+    drawWaveformCompare(origData, procData, state.waveMode);
+    updateWaveLegend();
+  }
+
+  $('btnWaveMode').addEventListener('click', ()=>{
+    if(!state.processedChannels){ log('먼저 마스터링을 처리해야 차이를 비교할 수 있어요.', 'warn'); return; }
+    state.waveMode = state.waveMode==='diff' ? 'overlay' : 'diff';
+    $('btnWaveMode').textContent = state.waveMode==='diff' ? '↔ 겹쳐보기로 전환' : '🔍 차이만 보기';
+    $('btnWaveMode').classList.toggle('active', state.waveMode==='diff');
+    refreshWaveform();
   });
-}
-function resetAll(){
-  S={tab:S.tab,region:null,country:null,genre:null,stories:[],moods:[],bpm:107,bpmPreset:null,bpmTouched:false,instruments:[],vocal:null,customStory:'',extras:[],modifiers:[],copied:false,songForm:null,songFormCopied:false};
-  render();
-}
-function resetTab(){
-  const t=S.tab;
-  if(t===0){S.region=null;S.country=null;S.genre=null;}
-  else if(t===1){S.stories=[];S.customStory='';}
-  else if(t===2){S.moods=[];}
-  else if(t===3){S.bpm=107;S.bpmPreset=null;S.bpmTouched=false;}
-  else if(t===4){S.instruments=[];}
-  else if(t===5){S.vocal=null;}
-  else if(t===6){S.extras=[];}
-  render();
-}
-function copyPrompt(){
-  const p=buildPrompt(S.modifiers);
-  if(!p)return;
-  navigator.clipboard.writeText(p).then(()=>{
-    S.copied=true;render();
-    setTimeout(()=>{S.copied=false;render();},2000);
-  });
-}
-function saveCSV(){
-  const rows=[
-    ['카테고리','선택값 (한글)','영문 프롬프트'],
-    ['스타일',[S.region,S.country,S.genre].filter(Boolean).join(' › '),GENRE_EN[S.genre]||S.genre||''],
-    ['분위기',S.moods.join(', '),S.moods.map(m=>{const i=MOODS_KO.indexOf(m);return i>=0?MOODS_EN[i]:m;}).join(', ')],
-    ['템포',S.bpm+'BPM',S.bpm+' BPM'],
-    ['악기',S.instruments.join(', '),S.instruments.map(inst=>{const bi=INSTR_BASE_KO.indexOf(inst);if(bi>=0)return INSTR_BASE_EN[bi];const g=Object.keys(INSTR_BY_GENRE_KO).find(g=>INSTR_BY_GENRE_KO[g].includes(inst));if(g){const gi=INSTR_BY_GENRE_KO[g].indexOf(inst);return INSTR_BY_GENRE_EN[g][gi];}return inst;}).join(', ')],
-    ['보컬',S.vocal||'',S.vocal?(VOCALS_EN[VOCALS_KO.indexOf(S.vocal)]||S.vocal):''],
-    ['기타',S.extras.join(', '),S.extras.map(e=>{const ei=EXTRAS_KO.indexOf(e);return ei>=0?EXTRAS_EN[ei]:e;}).join(', ')],
-    ['','',''],
-    ['최종 프롬프트','',buildPrompt()],
-  ];
-  const csv=rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n');
-  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-  a.download='suno-prompt-'+Date.now()+'.csv';a.click();
-}
 
-render();
+  refreshWaveform();
+
+  // ================= Presets (Character) =================
+  // band order: [Sub 60Hz, Bass 150Hz, L-Mid 400Hz, Mid 1kHz, H-Mid 2.5kHz, Pres 6kHz, Air 12kHz]
+  const PRESETS = {
+    standard: {eq:[0,0,0,0,0,0,0],      noise:20, ai:25, width:100},
+    clean:    {eq:[0,-1,-2,-1,2,2,1],   noise:45, ai:55, width:100},
+    punchy:   {eq:[4,3,-1,0,1,1,0],     noise:25, ai:30, width:95},
+    warm:     {eq:[2,3,2,0,-1,-2,-3],   noise:35, ai:40, width:90},
+    airy:     {eq:[-1,-1,-1,0,2,3,5],   noise:30, ai:45, width:130},
+    vshape:   {eq:[3,2,-2,-3,0,2,4],    noise:30, ai:35, width:115},
+  };
+
+  function applyPreset(name){
+    $('eqHint').style.display = 'none';
+    if(name==='custom') return;
+    const p = PRESETS[name];
+    document.querySelectorAll('.eqSlider').forEach((sl,i)=>{
+      sl.value = p.eq[i];
+      $('eqVal'+i).textContent = (p.eq[i]>0?'+':'')+p.eq[i]+'dB';
+    });
+    $('noiseAmt').value = p.noise;
+    $('noiseAmtVal').textContent = p.noise+'%';
+    $('aiDenoiseAmt').value = p.ai;
+    $('aiDenoiseAmtVal').textContent = p.ai+'%';
+    $('widthAmt').value = p.width;
+    $('widthAmtVal').textContent = p.width+'%';
+  }
+
+  $('presetSelect').addEventListener('change', (e)=> applyPreset(e.target.value));
+
+  $('btnSmartEq').addEventListener('click', ()=>{
+    if(!state.originalBuffer) return;
+    const buf = state.originalBuffer;
+    const channels = [];
+    for(let c=0;c<buf.numberOfChannels;c++) channels.push(buf.getChannelData(c).slice());
+    const bandDb = analyzeSpectralBalance(channels, buf.sampleRate);
+    const suggestion = suggestSmartEQ(bandDb);
+    document.querySelectorAll('.eqSlider').forEach((sl,i)=>{
+      sl.value = suggestion[i];
+      $('eqVal'+i).textContent = (suggestion[i]>0?'+':'')+suggestion[i]+'dB';
+    });
+    $('presetSelect').value = 'custom';
+    const nearestKey = nearestPresetKey(suggestion);
+    const hint = $('eqHint');
+    hint.style.display = 'block';
+    hint.textContent = '✦ 스마트 EQ 적용됨 — 밴드별 에너지를 곡 평균에 맞춰 자동 보정 · 가장 비슷한 프리셋: '+PRESET_LABELS[nearestKey];
+    log('스마트 EQ 분석 완료 — 유사 프리셋: '+PRESET_LABELS[nearestKey]+', 보정값 '+suggestion.map(v=>(v>0?'+':'')+v).join('/'), 'ok');
+  });
+
+  document.querySelectorAll('.eqSlider').forEach((sl,i)=>{
+    sl.addEventListener('input', ()=>{
+      $('eqVal'+i).textContent = (sl.value>0?'+':'')+sl.value+'dB';
+      $('presetSelect').value = 'custom';
+    });
+  });
+  $('noiseAmt').addEventListener('input', (e)=>{
+    $('noiseAmtVal').textContent = e.target.value+'%';
+    $('presetSelect').value = 'custom';
+  });
+  $('widthAmt').addEventListener('input', (e)=>{
+    $('widthAmtVal').textContent = e.target.value+'%';
+    $('presetSelect').value = 'custom';
+  });
+  $('targetLufs').addEventListener('input', (e)=>{
+    $('targetLufsVal').textContent = e.target.value+' LUFS';
+  });
+  $('ceiling').addEventListener('input', (e)=>{
+    $('ceilingVal').textContent = parseFloat(e.target.value).toFixed(1)+' dB';
+  });
+
+  // ================= User presets (localStorage) =================
+  const USER_PRESET_KEY = 'sunoMasterUserPresets';
+  function loadUserPresets(){
+    try{ return JSON.parse(localStorage.getItem(USER_PRESET_KEY) || '{}'); }
+    catch(e){ return {}; }
+  }
+  function saveUserPresets(obj){
+    localStorage.setItem(USER_PRESET_KEY, JSON.stringify(obj));
+  }
+  function currentSettingsSnapshot(){
+    return {
+      eq: Array.from(document.querySelectorAll('.eqSlider')).map(s=>parseFloat(s.value)),
+      noise: parseFloat($('noiseAmt').value),
+      ai: parseFloat($('aiDenoiseAmt').value),
+      width: parseFloat($('widthAmt').value),
+      targetLufs: parseFloat($('targetLufs').value),
+      ceiling: parseFloat($('ceiling').value),
+    };
+  }
+  function applySettingsSnapshot(p){
+    document.querySelectorAll('.eqSlider').forEach((sl,i)=>{
+      sl.value = p.eq[i];
+      $('eqVal'+i).textContent = (p.eq[i]>0?'+':'')+p.eq[i]+'dB';
+    });
+    $('noiseAmt').value = p.noise; $('noiseAmtVal').textContent = p.noise+'%';
+    $('aiDenoiseAmt').value = p.ai; $('aiDenoiseAmtVal').textContent = p.ai+'%';
+    $('widthAmt').value = p.width; $('widthAmtVal').textContent = p.width+'%';
+    $('targetLufs').value = p.targetLufs; $('targetLufsVal').textContent = p.targetLufs+' LUFS';
+    $('ceiling').value = p.ceiling; $('ceilingVal').textContent = parseFloat(p.ceiling).toFixed(1)+' dB';
+    $('presetSelect').value = 'custom';
+    $('eqHint').style.display = 'none';
+  }
+  function refreshUserPresetSelect(){
+    const presets = loadUserPresets();
+    const names = Object.keys(presets);
+    const sel = $('userPresetSelect');
+    sel.innerHTML = names.map(n=>`<option value="${n}">${n}</option>`).join('');
+    $('userPresetRow').style.display = names.length ? 'flex' : 'none';
+  }
+  $('btnSavePreset').addEventListener('click', ()=>{
+    const name = $('userPresetName').value.trim();
+    if(!name){ log('프리셋 이름을 입력하세요.', 'warn'); return; }
+    const presets = loadUserPresets();
+    presets[name] = currentSettingsSnapshot();
+    saveUserPresets(presets);
+    $('userPresetName').value = '';
+    refreshUserPresetSelect();
+    $('userPresetSelect').value = name;
+    log('프리셋 저장됨: '+name, 'ok');
+  });
+  $('btnLoadPreset').addEventListener('click', ()=>{
+    const name = $('userPresetSelect').value;
+    if(!name) return;
+    const presets = loadUserPresets();
+    if(presets[name]){ applySettingsSnapshot(presets[name]); log('프리셋 불러옴: '+name, 'ok'); }
+  });
+  $('btnDeletePreset').addEventListener('click', ()=>{
+    const name = $('userPresetSelect').value;
+    if(!name) return;
+    const presets = loadUserPresets();
+    delete presets[name];
+    saveUserPresets(presets);
+    refreshUserPresetSelect();
+    log('프리셋 삭제됨: '+name);
+  });
+  refreshUserPresetSelect();
+
+  // ================= File loading =================
+  const dropzone = $('dropzone');
+  const fileInput = $('fileInput');
+  dropzone.addEventListener('click', ()=> fileInput.click());
+  dropzone.addEventListener('dragover', (e)=>{ e.preventDefault(); dropzone.classList.add('drag'); });
+  dropzone.addEventListener('dragleave', ()=> dropzone.classList.remove('drag'));
+  dropzone.addEventListener('drop', (e)=>{
+    e.preventDefault(); dropzone.classList.remove('drag');
+    if(e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', (e)=>{
+    if(e.target.files.length) handleFile(e.target.files[0]);
+  });
+
+  async function handleFile(file){
+    log('파일 로딩: '+file.name);
+    $('eqHint').style.display = 'none';
+    $('btnNewSong').style.display = 'none';
+    state.waveMode = 'overlay';
+    $('btnWaveMode').textContent = '🔍 차이만 보기';
+    $('btnWaveMode').classList.remove('active');
+    const meta = $('fileMeta');
+    meta.style.display='block';
+    meta.textContent = file.name+' · '+(file.size/1024/1024).toFixed(2)+' MB';
+
+    const arrBuf = await file.arrayBuffer();
+    const ctx = getAudioCtx();
+    try{
+      const decoded = await ctx.decodeAudioData(arrBuf);
+      state.originalBuffer = decoded;
+      state.processedChannels = null;
+      log('디코딩 완료 · '+decoded.numberOfChannels+'채널 · '+decoded.sampleRate+'Hz · '+decoded.duration.toFixed(1)+'초', 'ok');
+
+      const chans = [];
+      for(let c=0;c<decoded.numberOfChannels;c++) chans.push(decoded.getChannelData(c).slice());
+      log('음량 분석 중 (LUFS 계산)...');
+      setTimeout(()=>{
+        const lufs = measureLUFS(chans, decoded.sampleRate);
+        const peak = measureTruePeakDb(chans);
+        state.origLufsVal = lufs;
+        state.peakDb = peak;
+        updateLufsDisplay('orig', lufs);
+        $('peakVal').textContent = peak.toFixed(1)+' dBTP';
+        $('peakVal').className = 'value '+(peak > -1 ? 'hot' : 'dim');
+        drawVU(lufs);
+        refreshWaveform();
+        log('원본 러프니스: '+lufs.toFixed(1)+' LUFS, 트루피크 '+peak.toFixed(1)+' dBTP', 'ok');
+        $('btnProcess').disabled = false;
+        $('btnPlay').disabled = false;
+        $('btnAutoMaster').disabled = false;
+        $('btnSmartEq').disabled = false;
+      }, 30);
+    }catch(err){
+      log('디코딩 실패: 지원되지 않는 파일 형식입니다.', 'warn');
+      console.error(err);
+    }
+  }
+
+  function updateLufsDisplay(which, val){
+    const el = which==='orig' ? $('origLufs') : $('procLufs');
+    el.textContent = val.toFixed(1);
+    el.className = 'value ' + (val > -8 ? 'hot' : (val < -18 ? 'dim' : 'ok'));
+  }
+
+  // ================= FFT engine (radix-2, precomputed twiddles) =================
+  const fftTableCache = {};
+  function getFFTTables(N){
+    if(fftTableCache[N]) return fftTableCache[N];
+    const bits = Math.log2(N);
+    const bitrev = new Uint32Array(N);
+    for(let i=0;i<N;i++){
+      let x=i, y=0;
+      for(let b=0;b<bits;b++){ y=(y<<1)|(x&1); x>>=1; }
+      bitrev[i]=y;
+    }
+    const cosTable = new Float32Array(N/2);
+    const sinTable = new Float32Array(N/2);
+    for(let i=0;i<N/2;i++){
+      const angle = -2*Math.PI*i/N;
+      cosTable[i]=Math.cos(angle);
+      sinTable[i]=Math.sin(angle);
+    }
+    fftTableCache[N] = {bitrev, cosTable, sinTable};
+    return fftTableCache[N];
+  }
+
+  function fftInPlace(re, im, inverse){
+    const N = re.length;
+    const {bitrev, cosTable, sinTable} = getFFTTables(N);
+    for(let i=0;i<N;i++){
+      const j = bitrev[i];
+      if(j>i){
+        let t=re[i]; re[i]=re[j]; re[j]=t;
+        t=im[i]; im[i]=im[j]; im[j]=t;
+      }
+    }
+    for(let size=2; size<=N; size*=2){
+      const half = size/2;
+      const tableStep = N/size;
+      for(let start=0; start<N; start+=size){
+        for(let k=0;k<half;k++){
+          const tIdx = k*tableStep;
+          const c = cosTable[tIdx];
+          const s = inverse ? -sinTable[tIdx] : sinTable[tIdx];
+          const evenIdx = start+k, oddIdx = start+k+half;
+          const oddRe = re[oddIdx]*c - im[oddIdx]*s;
+          const oddIm = re[oddIdx]*s + im[oddIdx]*c;
+          re[oddIdx] = re[evenIdx]-oddRe;
+          im[oddIdx] = im[evenIdx]-oddIm;
+          re[evenIdx] += oddRe;
+          im[evenIdx] += oddIm;
+        }
+      }
+    }
+    if(inverse){
+      for(let i=0;i<N;i++){ re[i]/=N; im[i]/=N; }
+    }
+  }
+
+  const hannCache = {};
+  function getHann(N){
+    if(hannCache[N]) return hannCache[N];
+    const w = new Float32Array(N);
+    for(let i=0;i<N;i++) w[i] = 0.5 - 0.5*Math.cos(2*Math.PI*i/(N-1));
+    hannCache[N]=w;
+    return w;
+  }
+
+  // Detects and attenuates narrowband spectral spikes above ~5kHz that are
+  // characteristic of AI vocoder / diffusion-model artifacts (comb-like ringing,
+  // metallic warble) — distinct from natural broadband harmonic content.
+  async function spectralAIDenoise(data, fs, strength, onProgress){
+    if(strength<=0) return data;
+    const N = 1024;
+    const hop = N/2; // 50% overlap, exact COLA for Hann
+    const window = getHann(N);
+    const pad = N;
+    const padded = new Float32Array(data.length + 2*pad);
+    padded.set(data, pad);
+    const outLen = padded.length;
+    const out = new Float32Array(outLen);
+    const norm = new Float32Array(outLen);
+
+    const re = new Float32Array(N);
+    const im = new Float32Array(N);
+    const half = N/2;
+    const minBin = Math.max(2, Math.floor(5000*N/fs));
+    const spikeFactor = 1.7;
+    const maxReduction = 0.15 + 0.65*strength; // how far spikes get pulled toward local median
+
+    const totalSteps = Math.max(1, Math.floor((outLen-N)/hop)+1);
+    let step = 0;
+    for(let pos=0; pos+N<=outLen; pos+=hop){
+      for(let i=0;i<N;i++){ re[i]=padded[pos+i]*window[i]; im[i]=0; }
+      fftInPlace(re, im, false);
+
+      const mag = new Float32Array(half+1);
+      for(let k=0;k<=half;k++) mag[k]=Math.hypot(re[k], im[k]);
+
+      for(let k=minBin;k<half;k++){
+        const lo = Math.max(minBin, k-4), hi = Math.min(half-1, k+4);
+        let sum=0, cnt=0;
+        for(let j=lo;j<=hi;j++){ if(j===k) continue; sum+=mag[j]; cnt++; }
+        const localAvg = cnt ? sum/cnt : mag[k];
+        if(mag[k] > localAvg*spikeFactor && mag[k] > 1e-6){
+          const targetMag = localAvg + (mag[k]-localAvg)*(1-maxReduction);
+          const gain = targetMag/mag[k];
+          re[k]*=gain; im[k]*=gain;
+          const mirror = N-k;
+          if(mirror>k){ re[mirror]*=gain; im[mirror]*=gain; }
+        }
+      }
+
+      fftInPlace(re, im, true);
+      for(let i=0;i<N;i++){
+        out[pos+i] += re[i]*window[i];
+        norm[pos+i] += window[i]*window[i];
+      }
+
+      step++;
+      if(step % 30 === 0){
+        if(onProgress) onProgress(step/totalSteps);
+        await yieldUI();
+      }
+    }
+
+    const result = new Float32Array(data.length);
+    for(let i=0;i<data.length;i++){
+      const idx = i+pad;
+      result[i] = norm[idx]>1e-8 ? out[idx]/norm[idx] : padded[idx];
+    }
+    if(onProgress) onProgress(1);
+    return result;
+  }
+
+  // ================= Quick heuristic analysis (for one-click auto master) =================
+  function analyzeTrack(channels, fs){
+    const mono = channels.length>1
+      ? channels[0].map((v,i)=> (v+channels[1][i])*0.5)
+      : channels[0];
+
+    // HF energy ratio: energy above ~8kHz vs total
+    const hp = makeBiquad('highpass', fs, 8000, 0, 0.707);
+    const hf = runBiquad(hp, mono.slice());
+    let hfEnergy=0, totalEnergy=0;
+    for(let i=0;i<mono.length;i++){ hfEnergy += hf[i]*hf[i]; totalEnergy += mono[i]*mono[i]; }
+    const hfRatio = totalEnergy>0 ? hfEnergy/totalEnergy : 0;
+
+    // Low-band ratio (<300Hz) for a rough spectral tilt estimate, via highpass complement
+    const hp300 = makeBiquad('highpass', fs, 300, 0, 0.707);
+    const above300 = runBiquad(hp300, mono.slice());
+    let above300Energy=0;
+    for(let i=0;i<mono.length;i++) above300Energy += above300[i]*above300[i];
+    const lowRatio = totalEnergy>0 ? 1 - (above300Energy/totalEnergy) : 0;
+
+    // Stereo correlation (mono-ness)
+    let correlation = 1;
+    if(channels.length>1){
+      const L=channels[0], R=channels[1];
+      let sumLR=0,sumLL=0,sumRR=0;
+      for(let i=0;i<L.length;i++){ sumLR+=L[i]*R[i]; sumLL+=L[i]*L[i]; sumRR+=R[i]*R[i]; }
+      const denom = Math.sqrt(sumLL*sumRR);
+      correlation = denom>0 ? sumLR/denom : 1;
+    }
+
+    return { hfRatio, lowRatio, correlation };
+  }
+
+  // ================= Smart EQ: per-band spectral balance analysis =================
+  // Splits the track into the same 7 bands as the EQ (via successive highpass
+  // energy subtraction), then nudges outlier bands toward the track's own
+  // average level — a gentle auto-balancing EQ rather than a fixed target curve.
+  const EQ_BAND_EDGES = [30, 100, 250, 650, 1600, 3800, 9000, 16000]; // 8 edges bounding 7 bands
+  function analyzeSpectralBalance(channels, fs){
+    const mono = channels.length>1
+      ? channels[0].map((v,i)=> (v+channels[1][i])*0.5)
+      : channels[0];
+    const edgeEnergy = EQ_BAND_EDGES.map(freq=>{
+      const hp = makeBiquad('highpass', fs, freq, 0, 0.707);
+      const out = runBiquad(hp, mono.slice());
+      let e=0; for(let i=0;i<out.length;i++) e+=out[i]*out[i];
+      return e;
+    });
+    const bandEnergy = [];
+    for(let i=0;i<7;i++) bandEnergy.push(Math.max(0, edgeEnergy[i]-edgeEnergy[i+1]));
+    const total = bandEnergy.reduce((a,b)=>a+b,0) || 1e-12;
+    return bandEnergy.map(e => 10*Math.log10(e/total + 1e-12));
+  }
+  function suggestSmartEQ(bandDb){
+    const mean = bandDb.reduce((a,b)=>a+b,0)/bandDb.length;
+    return bandDb.map(d => Math.max(-6, Math.min(6, Math.round(-(d-mean)*0.5))));
+  }
+  function nearestPresetKey(eqVec){
+    let best=null, bestDist=Infinity;
+    for(const key of Object.keys(PRESETS)){
+      const p = PRESETS[key];
+      let d=0; for(let i=0;i<7;i++){ const diff=eqVec[i]-p.eq[i]; d+=diff*diff; }
+      if(d<bestDist){ bestDist=d; best=key; }
+    }
+    return best;
+  }
+  const PRESET_LABELS = { standard:'Standard', clean:'Clean', punchy:'Punchy', warm:'Warm', airy:'Airy', vshape:'V-Shape' };
+
+  // ================= DSP chain =================
+  function processAudio(){
+    if(!state.originalBuffer) return;
+    $('btnProcess').disabled = true;
+    $('btnAutoMaster').disabled = true;
+    $('btnNewSong').style.display = 'none';
+    log('마스터링 처리 시작... (AI 아티팩트 제거 단계는 몇 초 걸릴 수 있어요)');
+    setProgress(0, '처리 준비 중...');
+    // defer so the log message paints before the async DSP work starts
+    setTimeout(runProcessing, 30);
+  }
+
+  async function runProcessing(){
+    const buf = state.originalBuffer;
+    const fs = buf.sampleRate;
+    const numCh = buf.numberOfChannels;
+    let channels = [];
+    for(let c=0;c<numCh;c++) channels.push(buf.getChannelData(c).slice());
+
+    // 1) AI 아티팩트 제거 (스펙트럴 스파이크 검출/감쇠) — heaviest step, chunked with progress
+    const aiDenoiseAmt = parseFloat($('aiDenoiseAmt').value)/100;
+    if(aiDenoiseAmt > 0){
+      setProgress(2, 'AI 아티팩트 제거 중...');
+      const denoised = [];
+      for(let c=0;c<channels.length;c++){
+        denoised.push(await spectralAIDenoise(channels[c], fs, aiDenoiseAmt, (f)=>{
+          const overall = (c + f) / channels.length; // 0..1 across all channels
+          setProgress(2 + overall*58, 'AI 아티팩트 제거 중... '+Math.round(overall*100)+'%');
+        }));
+      }
+      channels = denoised;
+      log('AI 아티팩트 제거 적용 ('+Math.round(aiDenoiseAmt*100)+'%) — 스펙트럴 스파이크 감쇠');
+    } else {
+      setProgress(60);
+    }
+
+    // 2) 톤 노이즈 억제: peaking cut ~10.5kHz + high shelf cut >13kHz
+    const noiseAmt = parseFloat($('noiseAmt').value)/100; // 0..1
+    if(noiseAmt > 0){
+      const peakCutDb = -18 * noiseAmt;
+      const shelfCutDb = -9 * noiseAmt;
+      channels = channels.map(ch=>{
+        const c1 = makeBiquad('peaking', fs, 10500, peakCutDb, 1.2);
+        let out = runBiquad(c1, ch);
+        const c2 = makeBiquad('highshelf', fs, 13000, shelfCutDb, 0.707);
+        out = runBiquad(c2, out);
+        return out;
+      });
+      log('고역 노이즈 억제 적용 ('+Math.round(noiseAmt*100)+'%)');
+    }
+    setProgress(65, 'EQ / 스테레오 폭 처리 중...');
+
+    // 2) Tone EQ (5 band)
+    const eqGains = Array.from(document.querySelectorAll('.eqSlider')).map(s=>parseFloat(s.value));
+    const eqFreqs = [60, 150, 400, 1000, 2500, 6000, 12000];
+    const eqTypes = ['lowshelf','peaking','peaking','peaking','peaking','peaking','highshelf'];
+    const eqQ = [0.707, 1.0, 1.0, 1.0, 1.0, 1.0, 0.707];
+    if(eqGains.some(g=>g!==0)){
+      channels = channels.map(ch=>{
+        let out = ch;
+        for(let i=0;i<7;i++){
+          if(eqGains[i]===0) continue;
+          const coef = makeBiquad(eqTypes[i], fs, eqFreqs[i], eqGains[i], eqQ[i]);
+          out = runBiquad(coef, out);
+        }
+        return out;
+      });
+      log('EQ 적용: '+eqGains.map((g,i)=>eqFreqs[i]+'Hz '+(g>0?'+':'')+g+'dB').join(', '));
+    }
+
+    // 3) Stereo width (mid-side)
+    const widthPct = parseFloat($('widthAmt').value)/100;
+    if(numCh>=2 && widthPct !== 1){
+      const L = channels[0], R = channels[1];
+      const newL = new Float32Array(L.length);
+      const newR = new Float32Array(R.length);
+      for(let i=0;i<L.length;i++){
+        const mid = (L[i]+R[i])*0.5;
+        const side = (L[i]-R[i])*0.5*widthPct;
+        newL[i] = mid+side;
+        newR[i] = mid-side;
+      }
+      channels[0]=newL; channels[1]=newR;
+      log('스테레오 폭 조절: '+Math.round(widthPct*100)+'%');
+    }
+    setProgress(72, '음압 보정 중...');
+
+    // 4) Measure loudness, apply gain to hit target LUFS
+    const targetLufs = parseFloat($('targetLufs').value);
+    const measuredLufs = measureLUFS(channels.map(c=>c.slice()), fs);
+    const gainDb = targetLufs - measuredLufs;
+    const gainLin = Math.pow(10, gainDb/20);
+    for(const ch of channels){
+      for(let i=0;i<ch.length;i++) ch[i] *= gainLin;
+    }
+    log('음압 보정: '+measuredLufs.toFixed(1)+' → '+targetLufs+' LUFS ('+(gainDb>0?'+':'')+gainDb.toFixed(1)+'dB 게인)');
+
+    // 5) Sample-peak safety limiter (lookahead brickwall)
+    setProgress(78, '리미터 처리 중...');
+    const ceilingDb = parseFloat($('ceiling').value);
+    const ceilingLin = Math.pow(10, ceilingDb/20);
+    let peakAfter = 0;
+    for(const ch of channels) for(let i=0;i<ch.length;i++){ const a=Math.abs(ch[i]); if(a>peakAfter) peakAfter=a; }
+    if(peakAfter > ceilingLin){
+      const lookahead = Math.round(0.003*fs); // 3ms
+      const release = Math.round(0.06*fs); // 60ms
+      // compute required gain envelope from max across channels
+      const n = channels[0].length;
+      const absMax = new Float32Array(n);
+      for(const ch of channels){
+        for(let i=0;i<n;i++){ const a=Math.abs(ch[i]); if(a>absMax[i]) absMax[i]=a; }
+      }
+      const gainEnv = new Float32Array(n).fill(1);
+      for(let i=0;i<n;i++){
+        if(absMax[i] > ceilingLin){
+          const need = ceilingLin/absMax[i];
+          const start = Math.max(0, i-lookahead);
+          for(let j=start;j<=i;j++) if(gainEnv[j]>need) gainEnv[j]=need;
+        }
+      }
+      // smooth release
+      for(let i=1;i<n;i++){
+        if(gainEnv[i] > gainEnv[i-1]){
+          const maxStep = 1/release;
+          gainEnv[i] = Math.min(gainEnv[i], gainEnv[i-1]+maxStep);
+        }
+      }
+      for(const ch of channels) for(let i=0;i<n;i++) ch[i] *= gainEnv[i];
+      log('리미터 작동: 샘플 피크를 '+ceilingDb.toFixed(1)+'dB 이하로 제한', 'warn');
+    }
+
+    // 6) True-peak (dBTP) verification — sample-peak limiting alone can leave
+    // inter-sample overs above the ceiling, so measure with 4x oversampling
+    // and apply one extra broadband trim if it's still hot.
+    setProgress(82, '트루피크 확인 중...');
+    let truePeakDb = await measureTruePeakDbAsync(channels, (f)=>{
+      setProgress(82 + f*13, '트루피크 확인 중... '+Math.round(f*100)+'%');
+    });
+    if(truePeakDb > ceilingDb){
+      const extraGainDb = ceilingDb - truePeakDb - 0.1; // small extra margin
+      const extraGainLin = Math.pow(10, extraGainDb/20);
+      for(const ch of channels) for(let i=0;i<ch.length;i++) ch[i] *= extraGainLin;
+      log('트루피크 보정: 인터샘플 오버 감지 · 추가 '+extraGainDb.toFixed(1)+'dB 트림', 'warn');
+      truePeakDb += extraGainDb;
+    }
+    setProgress(97, '마무리 중...');
+
+    state.processedChannels = channels;
+    state.processedSampleRate = fs;
+
+    const finalLufs = measureLUFS(channels.map(c=>c.slice()), fs);
+    state.procLufsVal = finalLufs;
+    updateLufsDisplay('proc', finalLufs);
+    drawVU(finalLufs);
+    refreshWaveform();
+    log('마스터링 완료 · 최종 '+finalLufs.toFixed(1)+' LUFS, 트루피크 '+truePeakDb.toFixed(1)+' dBTP', 'ok');
+
+    $('btnExport').disabled = false;
+    $('btnExportMp3').disabled = false;
+    $('btnProcess').disabled = false;
+    $('btnAutoMaster').disabled = false;
+    $('btnNewSong').style.display = 'inline-block';
+    setProgress(100, '완료');
+    setTimeout(hideProgress, 900);
+    $('btnB').click();
+  }
+
+  $('btnProcess').addEventListener('click', processAudio);
+
+  $('aiDenoiseAmt').addEventListener('input', (e)=>{
+    $('aiDenoiseAmtVal').textContent = e.target.value+'%';
+  });
+
+  // ================= One-click auto mastering =================
+  $('btnAutoMaster').addEventListener('click', ()=>{
+    if(!state.originalBuffer) return;
+    $('btnAutoMaster').disabled = true;
+    $('btnProcess').disabled = true;
+    log('원클릭 자동 마스터링: 트랙 분석 중...');
+    setTimeout(()=>{
+      const buf = state.originalBuffer;
+      const channels = [];
+      for(let c=0;c<buf.numberOfChannels;c++) channels.push(buf.getChannelData(c).slice());
+      const a = analyzeTrack(channels, buf.sampleRate);
+
+      // hfRatio: typical AI-vocal tracks run ~0.02–0.18. Map to reduction amounts.
+      const norm = Math.max(0, Math.min(1, (a.hfRatio-0.015)/0.14));
+      const noiseVal = Math.round(20 + norm*45);        // 20~65%
+      const aiVal = Math.round(30 + norm*55);           // 30~85%
+
+      // stereo width from correlation: near-mono (corr~1) -> widen a bit; already wide -> keep near 100%
+      let widthVal = 100;
+      if(buf.numberOfChannels>1){
+        widthVal = Math.round(Math.max(85, Math.min(130, 100 + (a.correlation-0.8)*120)));
+      }
+
+      // gentle spectral tilt correction: bass-light -> nudge low bands up, harsh top -> nudge high bands down
+      const lowNudge = a.lowRatio < 0.28 ? Math.round((0.28-a.lowRatio)*20) : (a.lowRatio>0.5 ? -Math.round((a.lowRatio-0.5)*14) : 0);
+      const highNudge = norm > 0.5 ? -Math.round((norm-0.5)*10) : Math.round((0.3-norm)*8);
+
+      document.querySelectorAll('.eqSlider').forEach((sl,i)=>{
+        let v = 0;
+        if(i===0) v = Math.max(-4, Math.min(4, lowNudge));       // Sub 60Hz
+        if(i===1) v = Math.max(-3, Math.min(3, Math.round(lowNudge*0.6))); // Bass 150Hz
+        if(i===5) v = Math.max(-4, Math.min(4, Math.round(highNudge*0.7))); // Pres 6kHz
+        if(i===6) v = Math.max(-5, Math.min(5, highNudge));      // Air 12kHz
+        sl.value = v;
+        $('eqVal'+i).textContent = (v>0?'+':'')+v+'dB';
+      });
+      $('presetSelect').value = 'custom';
+
+      $('noiseAmt').value = noiseVal; $('noiseAmtVal').textContent = noiseVal+'%';
+      $('aiDenoiseAmt').value = aiVal; $('aiDenoiseAmtVal').textContent = aiVal+'%';
+      $('widthAmt').value = widthVal; $('widthAmtVal').textContent = widthVal+'%';
+      $('targetLufs').value = -14; $('targetLufsVal').textContent = '-14 LUFS';
+
+      log('분석 결과 — 고역 에너지 비율 '+(a.hfRatio*100).toFixed(1)+'%, 좌우상관 '+a.correlation.toFixed(2)+', 저역비율 '+(a.lowRatio*100).toFixed(0)+'%', 'ok');
+      log('자동 설정 → AI아티팩트 '+aiVal+'% · 톤노이즈 '+noiseVal+'% · 스테레오폭 '+widthVal+'% · 목표 -14 LUFS', 'ok');
+
+      $('btnProcess').disabled = false;
+      processAudio();
+    }, 30);
+  });
+
+  // ================= Real-time spectrum analyzer =================
+  let analyserNode = null;
+  function getAnalyser(){
+    if(!analyserNode){
+      const ctx = getAudioCtx();
+      analyserNode = ctx.createAnalyser();
+      analyserNode.fftSize = 1024;
+      analyserNode.smoothingTimeConstant = 0.75;
+    }
+    return analyserNode;
+  }
+  const specCanvas = $('specCanvas');
+  const specCtx = specCanvas.getContext('2d');
+  let specRAF = null;
+  function drawSpectrumFrame(){
+    const analyser = getAnalyser();
+    const bufferLength = analyser.frequencyBinCount;
+    const data = new Uint8Array(bufferLength);
+    analyser.getByteFrequencyData(data);
+    const w = specCanvas.width, h = specCanvas.height;
+    specCtx.clearRect(0,0,w,h);
+    specCtx.fillStyle = '#101215';
+    specCtx.fillRect(0,0,w,h);
+    const bars = 64;
+    const barW = w/bars;
+    for(let i=0;i<bars;i++){
+      // log-ish bucket mapping so low end isn't crushed into one bar
+      const idx = Math.min(bufferLength-1, Math.floor(Math.pow(i/bars, 2.2)*bufferLength));
+      const v = data[idx]/255;
+      const barH = Math.max(1, v*h);
+      specCtx.fillStyle = v>0.85 ? '#e5484d' : '#5fd3c4';
+      specCtx.fillRect(i*barW+1, h-barH, Math.max(1,barW-2), barH);
+    }
+    specRAF = requestAnimationFrame(drawSpectrumFrame);
+  }
+  function startSpectrum(){
+    if(!specRAF) drawSpectrumFrame();
+  }
+  function stopSpectrum(){
+    if(specRAF){ cancelAnimationFrame(specRAF); specRAF=null; }
+    specCtx.clearRect(0,0,specCanvas.width,specCanvas.height);
+  }
+
+  // ================= A/B playback =================
+  function stopPlayback(){
+    if(state.sourceNode){
+      try{ state.sourceNode.stop(); }catch(e){}
+      state.sourceNode = null;
+    }
+    state.isPlaying = false;
+    $('btnStop').disabled = true;
+    stopSpectrum();
+  }
+
+  function bufferFromChannels(channels, sampleRate){
+    const ctx = getAudioCtx();
+    const buf = ctx.createBuffer(channels.length, channels[0].length, sampleRate);
+    channels.forEach((ch,i)=> buf.copyToChannel(ch, i));
+    return buf;
+  }
+
+  $('btnPlay').addEventListener('click', ()=>{
+    stopPlayback();
+    const ctx = getAudioCtx();
+    let bufferToPlay;
+    if(state.playMode === 'B' && state.processedChannels){
+      bufferToPlay = bufferFromChannels(state.processedChannels, state.processedSampleRate);
+    } else {
+      bufferToPlay = state.originalBuffer;
+    }
+    if(!bufferToPlay) return;
+    const analyser = getAnalyser();
+    const src = ctx.createBufferSource();
+    src.buffer = bufferToPlay;
+    src.connect(analyser);
+    analyser.connect(ctx.destination);
+    src.onended = ()=>{ state.isPlaying=false; $('btnStop').disabled=true; stopSpectrum(); };
+    src.start();
+    state.sourceNode = src;
+    state.isPlaying = true;
+    $('btnStop').disabled = false;
+    startSpectrum();
+    log('재생: '+(state.playMode==='B' ? 'B (마스터링본)' : 'A (원본)'));
+  });
+  $('btnStop').addEventListener('click', stopPlayback);
+
+  $('btnA').addEventListener('click', ()=>{
+    state.playMode='A';
+    $('btnA').classList.add('active'); $('btnB').classList.remove('active');
+  });
+  $('btnB').addEventListener('click', ()=>{
+    if(!state.processedChannels) return;
+    state.playMode='B';
+    $('btnB').classList.add('active'); $('btnA').classList.remove('active');
+  });
+
+  // ================= WAV export =================
+  function encodeWav(channels, sampleRate){
+    const numCh = channels.length;
+    const len = channels[0].length;
+    const bytesPerSample = 2;
+    const blockAlign = numCh*bytesPerSample;
+    const dataSize = len*blockAlign;
+    const buffer = new ArrayBuffer(44+dataSize);
+    const view = new DataView(buffer);
+
+    function writeStr(offset, str){ for(let i=0;i<str.length;i++) view.setUint8(offset+i, str.charCodeAt(i)); }
+    writeStr(0,'RIFF');
+    view.setUint32(4, 36+dataSize, true);
+    writeStr(8,'WAVE');
+    writeStr(12,'fmt ');
+    view.setUint32(16,16,true);
+    view.setUint16(20,1,true); // PCM
+    view.setUint16(22,numCh,true);
+    view.setUint32(24,sampleRate,true);
+    view.setUint32(28,sampleRate*blockAlign,true);
+    view.setUint16(32,blockAlign,true);
+    view.setUint16(34,16,true);
+    writeStr(36,'data');
+    view.setUint32(40,dataSize,true);
+
+    let offset=44;
+    for(let i=0;i<len;i++){
+      for(let c=0;c<numCh;c++){
+        let s = Math.max(-1, Math.min(1, channels[c][i]));
+        s = s<0 ? s*0x8000 : s*0x7FFF;
+        view.setInt16(offset, s, true);
+        offset+=2;
+      }
+    }
+    return new Blob([view], {type:'audio/wav'});
+  }
+
+  $('btnExport').addEventListener('click', ()=>{
+    if(!state.processedChannels) return;
+    const blob = encodeWav(state.processedChannels, state.processedSampleRate);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'mastered_output.wav';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url), 2000);
+    log('WAV 파일 저장 완료: mastered_output.wav', 'ok');
+  });
+
+  // ================= MP3 export (lamejs) =================
+  function floatToInt16(channel){
+    const out = new Int16Array(channel.length);
+    for(let i=0;i<channel.length;i++){
+      let s = Math.max(-1, Math.min(1, channel[i]));
+      out[i] = s<0 ? s*0x8000 : s*0x7FFF;
+    }
+    return out;
+  }
+
+  async function encodeMp3(channels, sampleRate, kbps){
+    const numCh = Math.min(2, channels.length);
+    const encoder = new lamejs.Mp3Encoder(numCh, sampleRate, kbps);
+    const left = floatToInt16(channels[0]);
+    const right = numCh>1 ? floatToInt16(channels[1]) : null;
+    const blockSize = 1152;
+    const mp3Data = [];
+    const total = left.length;
+    for(let i=0;i<total;i+=blockSize){
+      const leftChunk = left.subarray(i, i+blockSize);
+      const buf = right
+        ? encoder.encodeBuffer(leftChunk, right.subarray(i, i+blockSize))
+        : encoder.encodeBuffer(leftChunk);
+      if(buf.length>0) mp3Data.push(buf);
+      if((i/blockSize) % 200 === 0){
+        setProgress(Math.min(99, (i/total)*100), 'MP3 인코딩 중... '+Math.round((i/total)*100)+'%');
+        await yieldUI();
+      }
+    }
+    const endBuf = encoder.flush();
+    if(endBuf.length>0) mp3Data.push(endBuf);
+    return new Blob(mp3Data, {type:'audio/mp3'});
+  }
+
+  $('btnExportMp3').addEventListener('click', async ()=>{
+    if(!state.processedChannels) return;
+    if(typeof lamejs === 'undefined'){
+      log('MP3 인코더 로딩 중입니다. 잠시 후 다시 시도해주세요.', 'warn');
+      return;
+    }
+    $('btnExportMp3').disabled = true;
+    setProgress(0, 'MP3 인코딩 준비 중...');
+    try{
+      const blob = await encodeMp3(state.processedChannels, state.processedSampleRate, 192);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'mastered_output.mp3';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(()=>URL.revokeObjectURL(url), 2000);
+      log('MP3 파일 저장 완료: mastered_output.mp3', 'ok');
+    }catch(err){
+      log('MP3 인코딩 실패: '+err.message, 'warn');
+      console.error(err);
+    }
+    $('btnExportMp3').disabled = false;
+    hideProgress();
+  });
+
+})();
 </script>
 </body>
 </html>
