@@ -1586,11 +1586,26 @@
     for(let i=0;i<n;i++) noise[i] /= peak; // normalize to -1..1
     return noise;
   }
+  function jitterBaseDelaySamples(fs, jitterAmt){
+    const maxDelayMs = 0.05 + jitterAmt*0.35; // up to ~0.4ms jitter depth (kept small: this modulates a band-split-and-recombined signal, which is far more comb-filter-prone than a plain whole-mix delay, so a large depth here reads as audible flanging rather than subtle timing variation)
+    return (maxDelayMs/1000*fs) + 2; // fixed inaudible offset so we always read behind
+  }
+  function delayLine(data, delaySamples){ // constant fractional-sample delay, linear interpolation
+    const out = new Float32Array(data.length);
+    for(let i=0;i<data.length;i++){
+      const readPos = i - delaySamples;
+      const idx0 = Math.floor(readPos), frac = readPos-idx0;
+      const s0 = idx0>=0 ? data[idx0] : 0;
+      const s1 = (idx0+1)>=0 && (idx0+1)<data.length ? data[idx0+1] : 0;
+      out[i] = s0 + (s1-s0)*frac;
+    }
+    return out;
+  }
   function applyJitter(data, fs, jitterAmt, noise){ // jitterAmt: 0..1, noise shared across channels
     if(jitterAmt<=0) return data;
-    const maxDelayMs = 0.15 + jitterAmt*1.2; // up to ~1.35ms jitter depth
+    const maxDelayMs = 0.05 + jitterAmt*0.35; // up to ~0.4ms jitter depth (kept small: this modulates a band-split-and-recombined signal, which is far more comb-filter-prone than a plain whole-mix delay, so a large depth here reads as audible flanging rather than subtle timing variation)
     const maxDelaySamples = maxDelayMs/1000*fs;
-    const baseDelay = maxDelaySamples + 2; // fixed inaudible offset so we always read behind
+    const baseDelay = jitterBaseDelaySamples(fs, jitterAmt);
     const out = new Float32Array(data.length);
     for(let i=0;i<data.length;i++){
       const readPos = i - (baseDelay + noise[i]*maxDelaySamples);
@@ -1616,10 +1631,19 @@
       for(let i=0;i<out.length;i++) out[i] = saturateSample(processed[i], driveAmt);
       processed = out;
     }
-    if(jitterAmt>0) processed = applyJitter(processed, fs, jitterAmt, sharedNoise);
+    let residualOut = residual;
+    if(jitterAmt>0){
+      processed = applyJitter(processed, fs, jitterAmt, sharedNoise);
+      // Without this, the untouched residual and the time-shifted vocal band fall
+      // out of phase at the 250Hz/4kHz crossover (the band split isn't a perfect
+      // brick wall), producing a sweeping comb-filter/flanger "swish" on playback.
+      // Delaying the residual by the same fixed base delay keeps them time-aligned,
+      // leaving only the intended micro-jitter as the audible difference.
+      residualOut = delayLine(residual, jitterBaseDelaySamples(fs, jitterAmt));
+    }
 
     const result = new Float32Array(data.length);
-    for(let i=0;i<data.length;i++) result[i] = residual[i] + processed[i];
+    for(let i=0;i<data.length;i++) result[i] = residualOut[i] + processed[i];
     return result;
   }
 
@@ -1901,15 +1925,12 @@
       $('widthAmt').value = widthVal; $('widthAmtVal').textContent = widthVal+'%';
       $('targetLufs').value = -14; $('targetLufsVal').textContent = '-14 LUFS';
 
-      // sat/jitter: no reliable signal-based way to detect "how AI-sounding"
-      // a track is without pitch/onset detection (out of scope here), so
-      // apply a modest fixed default that's subtle enough to be safe.
-      const satVal = 15, jitterVal = 10;
-      $('satAmt').value = satVal; $('satAmtVal').textContent = satVal+'%';
-      $('jitterAmt').value = jitterVal; $('jitterAmtVal').textContent = jitterVal+'%';
+      // sat/jitter는 트랙 분석만으로 "얼마나 AI 티가 나는지" 판단할 신뢰할 근거가 없고,
+      // 밴드 분리 후 재합성하는 방식 특성상 과하게 걸면 컴필터링(쉭쉭거림)이 들릴 수 있어
+      // 원클릭에서는 건드리지 않고 사용자가 직접 설정한 값(기본 0)을 그대로 둔다.
 
       log('분석 결과 — 고역 에너지 비율 '+(a.hfRatio*100).toFixed(1)+'%, 좌우상관 '+a.correlation.toFixed(2)+', 저역비율 '+(a.lowRatio*100).toFixed(0)+'%', 'ok');
-      log('자동 설정 → AI아티팩트 '+aiVal+'% · 톤노이즈 '+noiseVal+'% · 스테레오폭 '+widthVal+'% · 새츄레이션 '+satVal+'% · 지터 '+jitterVal+'% · 목표 -14 LUFS · EQ 유사 프리셋 '+PRESET_LABELS[nearestKey], 'ok');
+      log('자동 설정 → AI아티팩트 '+aiVal+'% · 톤노이즈 '+noiseVal+'% · 스테레오폭 '+widthVal+'% · 목표 -14 LUFS · EQ 유사 프리셋 '+PRESET_LABELS[nearestKey]+' (새츄레이션/지터는 원클릭에서 건드리지 않음 — 필요하면 03번 모듈에서 직접 설정)', 'ok');
 
       $('btnProcess').disabled = false;
       processAudio();
