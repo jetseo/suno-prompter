@@ -1386,20 +1386,18 @@
         widthVal = Math.round(Math.max(85, Math.min(130, 100 + (a.correlation-0.8)*120)));
       }
 
-      // gentle spectral tilt correction: bass-light -> nudge low bands up, harsh top -> nudge high bands down
-      const lowNudge = a.lowRatio < 0.28 ? Math.round((0.28-a.lowRatio)*20) : (a.lowRatio>0.5 ? -Math.round((a.lowRatio-0.5)*14) : 0);
-      const highNudge = norm > 0.5 ? -Math.round((norm-0.5)*10) : Math.round((0.3-norm)*8);
-
+      // full 7-band spectral balance analysis (same engine as the 스마트 EQ 추천 button)
+      const bandDb = analyzeSpectralBalance(channels, buf.sampleRate);
+      const eqSuggestion = suggestSmartEQ(bandDb);
       document.querySelectorAll('.eqSlider').forEach((sl,i)=>{
-        let v = 0;
-        if(i===0) v = Math.max(-4, Math.min(4, lowNudge));       // Sub 60Hz
-        if(i===1) v = Math.max(-3, Math.min(3, Math.round(lowNudge*0.6))); // Bass 150Hz
-        if(i===5) v = Math.max(-4, Math.min(4, Math.round(highNudge*0.7))); // Pres 6kHz
-        if(i===6) v = Math.max(-5, Math.min(5, highNudge));      // Air 12kHz
-        sl.value = v;
-        $('eqVal'+i).textContent = (v>0?'+':'')+v+'dB';
+        sl.value = eqSuggestion[i];
+        $('eqVal'+i).textContent = (eqSuggestion[i]>0?'+':'')+eqSuggestion[i]+'dB';
       });
       $('presetSelect').value = 'custom';
+      const nearestKey = nearestPresetKey(eqSuggestion);
+      const hint = $('eqHint');
+      hint.style.display = 'block';
+      hint.textContent = '✦ 원클릭 자동 마스터링에서 스마트 EQ 적용됨 · 가장 비슷한 프리셋: '+PRESET_LABELS[nearestKey];
 
       $('noiseAmt').value = noiseVal; $('noiseAmtVal').textContent = noiseVal+'%';
       $('aiDenoiseAmt').value = aiVal; $('aiDenoiseAmtVal').textContent = aiVal+'%';
@@ -1407,7 +1405,7 @@
       $('targetLufs').value = -14; $('targetLufsVal').textContent = '-14 LUFS';
 
       log('분석 결과 — 고역 에너지 비율 '+(a.hfRatio*100).toFixed(1)+'%, 좌우상관 '+a.correlation.toFixed(2)+', 저역비율 '+(a.lowRatio*100).toFixed(0)+'%', 'ok');
-      log('자동 설정 → AI아티팩트 '+aiVal+'% · 톤노이즈 '+noiseVal+'% · 스테레오폭 '+widthVal+'% · 목표 -14 LUFS', 'ok');
+      log('자동 설정 → AI아티팩트 '+aiVal+'% · 톤노이즈 '+noiseVal+'% · 스테레오폭 '+widthVal+'% · 목표 -14 LUFS · EQ 유사 프리셋 '+PRESET_LABELS[nearestKey], 'ok');
 
       $('btnProcess').disabled = false;
       processAudio();
