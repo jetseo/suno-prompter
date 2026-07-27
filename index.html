@@ -1741,22 +1741,31 @@
       log('[04] EQ 적용: '+changedBands.length+'개 밴드 조정 — '+changedBands.map(x=>eqFreqs[x.i]+'Hz '+(x.g>0?'+':'')+x.g+'dB').join(', '));
     }
 
-    // 3) Stereo width (mid-side)
+    // 3) Stereo width (mid-side, bass-mono / high-freq widening)
+    // Boosting the side channel broadband amplifies whatever lives there along
+    // with the stereo image — and background hiss/reverb tails tend to sit in
+    // the side channel far more than the centered mix elements do. Widening
+    // only above 250Hz (and leaving bass/low-side content untouched) keeps the
+    // low end tight and avoids audibly amplifying that noise floor.
     const widthPct = parseFloat($('widthAmt').value)/100;
     if(numCh>=2 && widthPct !== 1){
       const corrBefore = stereoCorrelation(channels[0], channels[1]);
       const L = channels[0], R = channels[1];
+      const side = new Float32Array(L.length);
+      for(let i=0;i<L.length;i++) side[i] = (L[i]-R[i])*0.5;
+      const sideHi = runBiquad(makeBiquad('highpass', fs, 250, 0, 0.707), side.slice());
       const newL = new Float32Array(L.length);
       const newR = new Float32Array(R.length);
       for(let i=0;i<L.length;i++){
         const mid = (L[i]+R[i])*0.5;
-        const side = (L[i]-R[i])*0.5*widthPct;
-        newL[i] = mid+side;
-        newR[i] = mid-side;
+        const sideLo = side[i]-sideHi[i];
+        const sideOut = sideLo + sideHi[i]*widthPct;
+        newL[i] = mid+sideOut;
+        newR[i] = mid-sideOut;
       }
       channels[0]=newL; channels[1]=newR;
       const corrAfter = stereoCorrelation(newL, newR);
-      log('[05] 스테레오 폭 조절: 100% → '+Math.round(widthPct*100)+'% (좌우 상관도 '+corrBefore.toFixed(2)+' → '+corrAfter.toFixed(2)+')');
+      log('[05] 스테레오 폭 조절: 100% → '+Math.round(widthPct*100)+'% (250Hz 이하 저역은 제외, 중고역만 확장 — 좌우 상관도 '+corrBefore.toFixed(2)+' → '+corrAfter.toFixed(2)+')');
     }
     setProgress(72, '음압 보정 중...');
 
@@ -1871,7 +1880,7 @@
       // stereo width from correlation: near-mono (corr~1) -> widen a bit; already wide -> keep near 100%
       let widthVal = 100;
       if(buf.numberOfChannels>1){
-        widthVal = Math.round(Math.max(85, Math.min(130, 100 + (a.correlation-0.8)*120)));
+        widthVal = Math.round(Math.max(85, Math.min(115, 100 + (a.correlation-0.8)*120)));
       }
 
       // full 7-band spectral balance analysis (same engine as the 스마트 EQ 추천 button)
