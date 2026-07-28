@@ -4,11 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Suno Master — 수노 AI 전용 마스터링 툴</title>
-<script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.0/lame.min.js" defer></script>
+<script src="vendor/lamejs/lame.min.js" defer></script>
 <style>
   @font-face {
     font-family: 'Pretendard';
-    src: url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/woff2/PretendardVariable.woff2') format('woff2');
+    src: url('vendor/pretendard/PretendardVariable.woff2') format('woff2');
     font-weight: 45 920;
   }
   :root{
@@ -186,6 +186,15 @@
   .progressWrap{ height:6px; background:var(--line); border-radius:3px; overflow:hidden; margin-top:12px; }
   .progressBar{ height:100%; width:0%; background:var(--amber); transition:width .12s linear; }
   .progressLabel{ font-family:var(--mono); font-size:11px; color:var(--text-dim); margin-top:6px; }
+  /* Used for phases with no real progress signal (e.g. the opaque ONNX inference call) --
+     communicates "actively working" instead of a number that would otherwise sit frozen. */
+  .progressBar.indeterminate{
+    width:100% !important;
+    background-image: repeating-linear-gradient(45deg, var(--amber) 0 10px, #7a5220 10px 20px);
+    background-size: 28px 28px;
+    animation: progressStripes 0.7s linear infinite;
+  }
+  @keyframes progressStripes{ from{ background-position:0 0; } to{ background-position:28px 0; } }
 
   /* ---------- Transport ---------- */
   .transport{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
@@ -338,6 +347,8 @@
       </label>
     </div>
     <div class="smartHint" style="display:block; margin-top:8px;">✦ 브라우저에서 직접 신경망 모델(약 57MB, 최초 1회만 다운로드 후 캐시됨)을 실행해 보컬/반주를 실제로 분리한 뒤 각각 처리합니다. 서버 업로드는 없지만 곡 길이에 따라 수 분~수십 분이 걸릴 수 있고, 실패 시 위의 대역 제한 근사 방식으로 자동 전환됩니다.</div>
+    <div class="progressWrap" id="stemProgressWrap" style="display:none; margin-top:12px;"><div class="progressBar" id="stemProgressBar"></div></div>
+    <div class="progressLabel" id="stemProgressLabel"></div>
   </div>
 
   <!-- 4. Character 프리셋 & EQ -->
@@ -463,6 +474,23 @@
   function hideProgress(){
     $('progressWrap').style.display = 'none';
     $('progressLabel').textContent = '';
+  }
+  // Dedicated sub-progress bar for AI stem separation, shown at full 0-100% resolution
+  // (the master bar only allocates a 20-point slice to this whole step, too coarse to see
+  // movement on). indeterminate=true switches to a striped/animated fill for phases with
+  // no real progress signal (the opaque ONNX inference call), rather than a number that
+  // would otherwise just sit still and look frozen.
+  function setStemProgress(pct, label, indeterminate){
+    $('stemProgressWrap').style.display = 'block';
+    const bar = $('stemProgressBar');
+    bar.classList.toggle('indeterminate', !!indeterminate);
+    if(!indeterminate) bar.style.width = Math.max(0,Math.min(100,pct)) + '%';
+    if(label!==undefined) $('stemProgressLabel').textContent = label;
+  }
+  function hideStemProgress(){
+    $('stemProgressWrap').style.display = 'none';
+    $('stemProgressBar').classList.remove('indeterminate');
+    $('stemProgressLabel').textContent = '';
   }
 
   function getAudioCtx(){
@@ -1352,8 +1380,16 @@
       document.head.appendChild(s);
     });
     if(!window.ort) throw new Error('ONNX Runtime 로드 실패');
-    ort.env.wasm.numThreads = 1;
+    // Multi-threaded WASM inference needs SharedArrayBuffer, which only exists when the
+    // page is served cross-origin isolated (requires the server's COOP/COEP headers to
+    // have actually taken effect). Fall back to single-threaded whenever that's not true
+    // -- e.g. local testing without those headers, or a proxy/CDN that strips them --
+    // rather than silently failing.
+    const threaded = window.crossOriginIsolated === true;
+    ort.env.wasm.numThreads = threaded ? Math.min(navigator.hardwareConcurrency || 4, 4) : 1;
+    mdxThreadCount = ort.env.wasm.numThreads;
   }
+  let mdxThreadCount = 1;
   // Fetches a URL manually (instead of handing it to ORT to fetch internally) so we can
   // report real byte-level download progress instead of the progress bar sitting frozen
   // for however long the ~70MB runtime+model download takes.
@@ -1418,13 +1454,14 @@
   }
 
   // Runs one fixed-size (chunkSize-sample) stereo chunk through STFT -> ONNX model -> ISTFT.
-  // onProgress(0..1) reports real progress through this chunk: STFT (L then R) covers 0-40%,
-  // the opaque ONNX inference call covers 40-60% (no sub-progress possible — it's a single
-  // black-box WASM call), ISTFT (L then R) covers 60-100%.
+  // onProgress(0..1, phase) reports real progress through this chunk: STFT (L then R) covers
+  // 0-40% (phase='stft'), the opaque ONNX inference call covers 40-60% (phase='inference' --
+  // no sub-progress possible, it's a single black-box WASM call, callers should show this as
+  // indeterminate rather than a number), ISTFT (L then R) covers 60-100% (phase='istft').
   async function runMdxChunk(session, Lchunk, Rchunk, onProgress){
-    const report = (phaseStart, phaseWeight, frac)=>{ if(onProgress) onProgress(phaseStart + frac*phaseWeight); };
-    const stftL = await mdxStftChannel(Lchunk, f => report(0, 0.2, f));
-    const stftR = await mdxStftChannel(Rchunk, f => report(0.2, 0.2, f));
+    const report = (phaseStart, phaseWeight, phase, frac)=>{ if(onProgress) onProgress(phaseStart + frac*phaseWeight, phase); };
+    const stftL = await mdxStftChannel(Lchunk, f => report(0, 0.2, 'stft', f));
+    const stftR = await mdxStftChannel(Rchunk, f => report(0.2, 0.2, 'stft', f));
     const total = 4*MDX_DIM_F*MDX_DIM_T;
     const inputData = new Float32Array(total);
     function writeCh(chIdx, arr2d){
@@ -1436,9 +1473,9 @@
     }
     writeCh(0, stftL.re); writeCh(1, stftL.im); writeCh(2, stftR.re); writeCh(3, stftR.im);
     const inputTensor = new ort.Tensor('float32', inputData, [1,4,MDX_DIM_F,MDX_DIM_T]);
-    if(onProgress) onProgress(0.4);
+    if(onProgress) onProgress(0.4, 'inference');
     const results = await session.run({ input: inputTensor });
-    if(onProgress) onProgress(0.6);
+    if(onProgress) onProgress(0.6, 'istft');
     const outData = results[session.outputNames[0]].data;
     function extractOutCh(chIdx){
       const arr2d = new Array(MDX_DIM_F);
@@ -1451,8 +1488,8 @@
       }
       return arr2d;
     }
-    const outL = await mdxIstftChannel(extractOutCh(0), extractOutCh(1), MDX_DIM_T, f => report(0.6, 0.2, f));
-    const outR = await mdxIstftChannel(extractOutCh(2), extractOutCh(3), MDX_DIM_T, f => report(0.8, 0.2, f));
+    const outL = await mdxIstftChannel(extractOutCh(0), extractOutCh(1), MDX_DIM_T, f => report(0.6, 0.2, 'istft', f));
+    const outR = await mdxIstftChannel(extractOutCh(2), extractOutCh(3), MDX_DIM_T, f => report(0.8, 0.2, 'istft', f));
     return { L: outL, R: outR };
   }
 
@@ -1483,9 +1520,11 @@
     // The one-time runtime+model download gets a fixed share of the overall progress bar;
     // the rest is spent moving through chunks. Within a chunk, runMdxChunk reports real
     // progress through its STFT/inference/ISTFT phases (see its own comment for the split).
+    // onProgress(frac, label, phase) -- phase is 'download'|'stft'|'inference'|'istft', so
+    // callers can render the opaque 'inference' phase as indeterminate instead of a number.
     const DOWNLOAD_WEIGHT = 0.15;
     const session = await ensureMdxSession((frac, label)=>{
-      if(onProgress) onProgress(frac*DOWNLOAD_WEIGHT, label);
+      if(onProgress) onProgress(frac*DOWNLOAD_WEIGHT, label, 'download');
     });
 
     let chunkIdx = 0;
@@ -1502,9 +1541,10 @@
         Lc = Lp; Rc = Rp;
       }
       const chunkStartFrac = (chunkIdx-1)/totalChunks;
-      const label = '🧬 AI 스템 분리 중... 청크 '+chunkIdx+'/'+totalChunks;
-      const out = await runMdxChunk(session, Lc, Rc, (subFrac)=>{
-        if(onProgress) onProgress(DOWNLOAD_WEIGHT + (chunkStartFrac + subFrac/totalChunks)*(1-DOWNLOAD_WEIGHT), label);
+      const phaseLabels = { stft: '스펙트럼 변환(STFT) 중', inference: 'AI 추론 중', istft: '파형 복원(ISTFT) 중' };
+      const out = await runMdxChunk(session, Lc, Rc, (subFrac, phase)=>{
+        const label = '🧬 청크 '+chunkIdx+'/'+totalChunks+' — '+phaseLabels[phase];
+        if(onProgress) onProgress(DOWNLOAD_WEIGHT + (chunkStartFrac + subFrac/totalChunks)*(1-DOWNLOAD_WEIGHT), label, phase);
       });
       for(let k=0;k<chunkActual;k++){
         const w = window[k];
@@ -1852,9 +1892,12 @@
       if(useStemSep){
         try{
           setProgress(65, '🧬 AI 스템 분리 준비 중...');
-          const sep = await separateStemsFull(channels, fs, (frac, label)=>{
+          setStemProgress(0, '🧬 AI 스템 분리 준비 중...');
+          const sep = await separateStemsFull(channels, fs, (frac, label, phase)=>{
             setProgress(65 + frac*20, label || '🧬 AI 스템 분리 중...');
+            setStemProgress(frac*100, label || '🧬 AI 스템 분리 중...', phase==='inference');
           });
+          hideStemProgress();
           const sharedNoise = jitterAmt > 0 ? generateSmoothNoise(channels[0].length, fs, 5) : null;
           const vocalsProcessed = sep.vocals.map(ch => {
             let out = ch;
@@ -1873,9 +1916,10 @@
             for(let i=0;i<out.length;i++) out[i] = inst[i] + voc[i];
             return out;
           });
-          log('[03] 🧬 실제 AI 스템 분리 적용 (신경망으로 보컬/반주 완전 분리 후 개별 처리) — 새츄레이션 '+Math.round(satAmt*100)+'% · 지터 '+Math.round(jitterAmt*100)+'%');
+          log('[03] 🧬 실제 AI 스템 분리 적용 (신경망으로 보컬/반주 완전 분리 후 개별 처리, AI 추론 '+mdxThreadCount+'개 스레드) — 새츄레이션 '+Math.round(satAmt*100)+'% · 지터 '+Math.round(jitterAmt*100)+'%');
           stemsOk = true;
         } catch(err){
+          hideStemProgress();
           log('[03] ⚠ AI 스템 분리 실패 ('+err.message+') — 대역 제한 근사 방식으로 자동 전환', 'warn');
         }
       }
