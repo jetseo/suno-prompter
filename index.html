@@ -1380,13 +1380,12 @@
       document.head.appendChild(s);
     });
     if(!window.ort) throw new Error('ONNX Runtime 로드 실패');
-    // Multi-threaded WASM inference needs SharedArrayBuffer, which only exists when the
-    // page is served cross-origin isolated (requires the server's COOP/COEP headers to
-    // have actually taken effect). Fall back to single-threaded whenever that's not true
-    // -- e.g. local testing without those headers, or a proxy/CDN that strips them --
-    // rather than silently failing.
-    const threaded = window.crossOriginIsolated === true;
-    ort.env.wasm.numThreads = threaded ? Math.min(navigator.hardwareConcurrency || 4, 4) : 1;
+    // Multi-threaded WASM (numThreads>1) was tried and reverted: it hung indefinitely during
+    // session creation on the deployed site (confirmed cross-origin isolated, so the thread
+    // pool did engage) with no error thrown, even though it couldn't be reproduced or debugged
+    // in this sandbox since crossOriginIsolated is always false locally. Forcing single-threaded
+    // unconditionally restores the known-working behavior.
+    ort.env.wasm.numThreads = 1;
     mdxThreadCount = ort.env.wasm.numThreads;
   }
   let mdxThreadCount = 1;
