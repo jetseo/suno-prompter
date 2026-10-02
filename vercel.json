@@ -3,34 +3,14 @@
     {
       "source": "/models/(.*)",
       "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=604800, immutable"
-        }
+        { "key": "Cache-Control", "value": "public, max-age=604800, immutable" }
       ]
     },
     {
       "source": "/vendor/(.*)",
       "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=604800, immutable"
-        }
+        { "key": "Cache-Control", "value": "public, max-age=604800, immutable" }
       ]
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/suno-api/:path*",
-      "destination": "https://studio-api.prod.suno.com/api/:path*"
-    },
-    {
-      "source": "/suno-cdn1/:path*",
-      "destination": "https://cdn1.suno.ai/:path*"
-    },
-    {
-      "source": "/suno-cdn2/:path*",
-      "destination": "https://cdn2.suno.ai/:path*"
     }
   ]
 }
